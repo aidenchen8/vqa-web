@@ -46,7 +46,7 @@
   </el-page-header>
   <div class="flex">
     <el-card style="width: 400px">
-      <el-form :model="formData" ref="formRef" label-width="50px">
+      <el-form ref="formRef" :model="formData" label-width="50px">
         <el-form-item label="Q:" prop="question">
           <el-input v-model="formData.question" type="textarea"></el-input>
         </el-form-item>
