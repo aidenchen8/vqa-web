@@ -17,7 +17,8 @@
           v-model="num"
           :min="0"
           :max="maxNum"
-          @change="updateTableData"
+          style="width: 200px"
+          @change="onNumChange"
         >
           <template #prefix>
             <span>第</span>
@@ -70,7 +71,7 @@
                   : 'default'
               "
               :underline="false"
-              @click="handleCurrentChange(scope.row)"
+              @click="selectQuestion(scope.row)"
             >
               {{ scope.row.question }}
             </el-link>
@@ -91,7 +92,9 @@
       </el-table>
     </el-card>
   </div>
-  <el-card style="margin-top: 16px"> </el-card>
+  <el-card style="margin-top: 16px">
+    <div id="image"></div>
+  </el-card>
 </template>
 
 <script lang="ts" setup>
@@ -111,7 +114,8 @@ import {
   ElCard,
 } from "element-plus";
 import type { UploadProps } from "element-plus";
-import Papa from "papaparse";
+import { IMG_FOLDER_PATH, BOX_PATH } from "./config";
+import { parseCSVRow, type TableRow } from "./utils";
 
 // 上传文件
 const fileList = ref<File[]>([]);
@@ -130,87 +134,201 @@ function handleUpload(e: Event) {
   }
 }
 
-// 表格数据类型定义
-interface TableRow {
-  question: string;
-  questionTranslation: string;
-  answer: string;
-  vgGuide: string;
-  vgGuideTranslation: string;
-}
-
 // 存储所有数据的 Map
 const questionsMap = ref<Record<string, TableRow[]>>();
-const maxNum = computed(() => Object.keys(questionsMap).length);
-// 新增：存储 index 到 filename 的映射
+// 存储 index 到 filename 的映射
 const fileIndexMap = ref<string[]>([]);
+const maxNum = computed(() => fileIndexMap.value.length);
 const tableData = ref<TableRow[]>([]);
 
-const handleExceed: UploadProps["onExceed"] = (files) => {
+const handleExceed: UploadProps["onExceed"] = (files: File[]) => {
   const file = files[0];
   if (!file) return;
   fileList.value = files;
-  Papa.parse(file, {
-    complete: (results) => {
-      const rows = results.data as string[][];
-      const dataMap: Record<string, TableRow[]> = {};
-      const indexArray: string[] = [];
-
-      // 跳过表头，处理每一行
-      rows.slice(1).forEach((columns) => {
-        if (columns.length < 2) return; // 跳过空行
-
-        const fileName = columns[1]; // file_name 在第二列
-        indexArray.push(fileName);
-
-        const fileQuestions: TableRow[] = [];
-        // 处理5个问题
-        for (let i = 0; i < 5; i++) {
-          fileQuestions[i] = {
-            question: columns[2 + i * 5] || "",
-            questionTranslation: columns[3 + i * 5] || "",
-            answer: columns[4 + i * 5] || "",
-            vgGuide: columns[5 + i * 5] || "",
-            vgGuideTranslation: columns[6 + i * 5] || "",
-          };
-        }
-
-        dataMap[fileName] = fileQuestions;
-      });
-
-      questionsMap.value = dataMap;
-      fileIndexMap.value = indexArray;
-      updateTableData(); // 默认显示第num题
-    },
-    error: (error) => {
-      console.error("CSV解析错误:", error);
-    },
+  parseCSVRow(file, (dataMap, indexArray) => {
+    questionsMap.value = dataMap;
+    fileIndexMap.value = indexArray;
+    onNumChange();
   });
 };
 
-// 优化后的 updateTableData 函数
-const num = ref(0);
+// 当前题目序号
+const num = ref(2866);
+// 当前图片文件名
 const currentFileName = computed(() => fileIndexMap.value[num.value]);
-function updateTableData(): void {
+function onNumChange(): void {
   tableData.value = questionsMap.value?.[currentFileName.value!] || [];
+  displayImage(currentFileName.value);
   localStorage.setItem("current_num", String(num.value));
 }
 
 // 表格当前行
 const currentRow = ref();
 
-const handleCurrentChange = (row: TableRow) => {
+const selectQuestion = (row: TableRow) => {
   currentRow.value = row;
   formData.value.question = row.question;
   formData.value.answer = row.answer;
   formData.value.vgGuide = row.vgGuide;
 };
 
-const formData = ref({
+const formData = ref<{
+  question: string;
+  answer: string;
+  vgGuide: string;
+  selectedBboxes: BBox[];
+}>({
   question: "",
   answer: "",
   vgGuide: "",
+  selectedBboxes: [],
 });
+
+/**
+ * 绘制图片
+ * @param name 图片名称
+ */
+function displayImage(name: string) {
+  var boxDom = document.getElementById("image");
+  if (!boxDom) return;
+  boxDom.innerHTML = "";
+
+  // 清空图像路径
+  const imageElement = document.createElement("img");
+  imageElement.style.objectFit = "scale-down";
+  imageElement.style.width = "100%";
+
+  const imagePath = IMG_FOLDER_PATH + name;
+  console.log("load", imagePath); // 在控制台打印图像路径
+  imageElement.src = imagePath;
+  boxDom.appendChild(imageElement);
+
+  // 在图像加载后绘制边界框
+  imageElement.onload = () => {
+    loadBboxes(name, imageElement);
+  };
+}
+
+// 读取边界框数据
+interface BBox {
+  type: string;
+  bbox2d: number[];
+}
+let bboxes: BBox[] = [];
+function loadBboxes(name: string, imageElement: HTMLImageElement) {
+  const bbox_Path = `${
+    BOX_PATH + name.replace(/\.(jpg|jpeg|png|gif|bmp|tiff|webp)$/i, "")
+  }.txt`;
+  debugger;
+
+  // 自动加载之前的标注数据
+  // if (annotations[name]) {
+  //   formData.value.selectedBboxes = annotations[name]; // 加载之前的标注
+  // }
+
+  fetch(bbox_Path)
+    .then((response) => response.text())
+    .then((data) => {
+      bboxes = [];
+      const lines = data.split("\n");
+      lines.forEach((line) => {
+        const parts = line.trim().split(" ");
+        if (parts.length >= 14) {
+          const bboxData = {
+            type: parts[0],
+            bbox2d: parts.slice(4, 8).map(Number),
+          };
+          bboxes.push(bboxData);
+        }
+      });
+      drawBboxes(imageElement);
+    })
+    .catch((error) => console.error("Error loading bounding boxes:", error));
+}
+
+// 绘制边界框
+let scale = 1; // 初始缩放比例
+function drawBboxes(imageElement: HTMLImageElement) {
+  const bboxesContainer = document.createElement("div");
+
+  const imgRect = imageElement.getBoundingClientRect(); // 获取缩放后的实际位置和大小
+  const imgLeft = imgRect.left; // 获取缩放后的左边位置
+  const imgTop = imgRect.top; // 获取缩放后的上边位置
+
+  bboxes.forEach((bbox) => {
+    const [x1, y1, x2, y2] = bbox.bbox2d;
+
+    // 计算边界框的宽度和高度
+    const bboxWidth = (x2 - x1) * scale;
+    const bboxHeight = (y2 - y1) * scale;
+
+    // 计算边界框的左上角位置
+    const left = imgLeft + x1 * scale;
+    const top = imgTop + y1 * scale;
+
+    // 创建并设置边界框元素
+    const bboxElement = document.createElement("div");
+    bboxElement.className = "bbox";
+    bboxElement.style.left = `${left}px`;
+    bboxElement.style.top = `${top}px`;
+    bboxElement.style.width = `${bboxWidth}px`;
+    bboxElement.style.height = `${bboxHeight}px`;
+
+    // 如果边界框在选中列表中，添加选中样式
+    //if (selectedBboxes.includes(bbox)) {
+    if (
+      formData.value.selectedBboxes.some(
+        (b) => JSON.stringify(b) === JSON.stringify(bbox)
+      )
+    ) {
+      bboxElement.classList.add("selected");
+    }
+
+    // 创建文本元素并设置内容
+    const labelElement = document.createElement("div");
+    labelElement.className = "bbox-label";
+    labelElement.innerText = bbox.type; // 假设 type 是要显示的名称
+    labelElement.style.position = "absolute";
+    labelElement.style.left = `${left}px`; // 文本位置与边界框对齐
+    labelElement.style.top = `${top}px`; // 文本位置与边界框对齐
+    labelElement.style.transform = `translateY(-100%)`; // 使文本在边界框上方显示
+
+    // 添加点击事件监听器
+    bboxElement.addEventListener("click", (event) => {
+      event.stopPropagation(); // 阻止事件冒泡到图片
+      handleBboxClick(bbox, imageElement); // 调用外部处理程序
+    });
+
+    // 添加到容器中
+    bboxesContainer.appendChild(bboxElement);
+    bboxesContainer.appendChild(labelElement);
+  });
+}
+
+// 定义点击事件处理程序
+function handleBboxClick(bbox: BBox, imageElement: HTMLImageElement) {
+  // 使用深度比较来检查边界框是否已被选中
+  const isSelected = formData.value.selectedBboxes.some(
+    (selectedBbox) =>
+      selectedBbox.type === bbox.type &&
+      JSON.stringify(selectedBbox.bbox2d) === JSON.stringify(bbox.bbox2d)
+  );
+
+  if (isSelected) {
+    // 使用深度比较来移除选中的边界框
+    formData.value.selectedBboxes = formData.value.selectedBboxes.filter(
+      (selectedBbox) =>
+        !(
+          selectedBbox.type === bbox.type &&
+          JSON.stringify(selectedBbox.bbox2d) === JSON.stringify(bbox.bbox2d)
+        )
+    );
+  } else {
+    formData.value.selectedBboxes.push(bbox); // 添加到选择列表
+  }
+
+  drawBboxes(imageElement); // 重新绘制边界框
+}
 
 onMounted(() => {
   // 初始化时设置当前数目

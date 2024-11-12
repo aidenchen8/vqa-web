@@ -1,37 +1,47 @@
-export function parseCSVRow(row: any) {
-  const columns = [];
-  let currentColumn = "";
-  let inQuotes = false;
+import Papa from "papaparse";
 
-  for (let i = 0; i < row.length; i++) {
-    const char = row[i];
+export interface TableRow {
+  question: string;
+  questionTranslation: string;
+  answer: string;
+  vgGuide: string;
+  vgGuideTranslation: string;
+}
+export function parseCSVRow(
+  file: File,
+  callback: (dataMap: Record<string, TableRow[]>, indexArray: string[]) => void
+) {
+  Papa.parse(file, {
+    complete: (results: any) => {
+      const rows = results.data as string[][];
+      const dataMap: Record<string, TableRow[]> = {};
+      const indexArray: string[] = [];
 
-    // 如果遇到引号，且下一个字符也是引号，则视为转义引号
-    if (char === '"' && row[i + 1] === '"') {
-      currentColumn += '"';
-      i++; // 跳过下一个引号
-      continue;
-    }
+      // 跳过表头，处理每一行
+      rows.slice(1).forEach((columns) => {
+        if (columns.length < 2) return; // 跳过空行
 
-    // 开始或结束引号
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
+        const fileName = columns[1]; // file_name 在第二列
+        indexArray.push(fileName);
 
-    // 如果不在引号内，且遇到逗号，则分割字段
-    if (char === "," && !inQuotes) {
-      columns.push(currentColumn);
-      currentColumn = "";
-      continue;
-    }
+        const fileQuestions: TableRow[] = [];
+        // 处理5个问题
+        for (let i = 0; i < 5; i++) {
+          fileQuestions[i] = {
+            question: columns[2 + i * 5] || "",
+            questionTranslation: columns[3 + i * 5] || "",
+            answer: columns[4 + i * 5] || "",
+            vgGuide: columns[5 + i * 5] || "",
+            vgGuideTranslation: columns[6 + i * 5] || "",
+          };
+        }
 
-    // 其他字符，直接添加到当前字段
-    currentColumn += char;
-  }
-
-  // 添加最后一个字段
-  columns.push(currentColumn);
-
-  return columns;
+        dataMap[fileName] = fileQuestions;
+      });
+      callback(dataMap, indexArray);
+    },
+    error: (error: any) => {
+      console.error("CSV解析错误:", error);
+    },
+  });
 }
