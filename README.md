@@ -1,11 +1,28 @@
-# Vue 3 + TypeScript + Vite
+# VQA Annotation System
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+This is a VAQ annotation system used for V2X roadside data labeling.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## Install
 
+- make sure you have install node.js v20+
 
-## 项目说明
+```sh
+# install pnpm
+npm i pnpm -g
 
-优化此项目：https://github.com/rohnson1999/VQA_data_checker/tree/main
-http://47.93.29.116:8081/
+# enable corepack
+corepack enable
+
+# install packages
+pnpm i
+```
+
+## Architecture
+
+### Front-end
+
+Vue3 + vite
+
+### Back-end
+
+express
