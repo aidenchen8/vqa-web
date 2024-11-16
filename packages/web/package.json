@@ -1,19 +1,25 @@
 {
-  "name": "vqa",
+  "name": "vqa-web",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm -C packages/web dev",
-    "build": "pnpm -C packages/web build",
-    "preview": "pnpm -C packages/web preview",
-    "serve": "pnpm -C packages/server dev"
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
   },
-  "dependencies": {},
+  "dependencies": {
+    "dayjs": "^1.11.13",
+    "element-plus": "^2.8.7",
+    "papaparse": "^5.4.1",
+    "vue": "^3.5.12"
+  },
   "devDependencies": {
     "@babel/core": "~7.25.2",
     "@babel/eslint-parser": "~7.25.1",
     "@types/papaparse": "^5.3.15",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/tsconfig": "^0.5.1",
     "eslint": "^9.14.0",
     "eslint-plugin-react": "~7.37.0",
     "eslint-plugin-vue": "~9.28.0",
@@ -30,7 +36,9 @@
     "stylelint-order": "~6.0.4",
     "typescript": "~5.6.2",
     "typescript-eslint": "~8.7.0",
-    "vue-eslint-parser": "~9.4.3"
+    "vite": "^5.4.10",
+    "vue-eslint-parser": "~9.4.3",
+    "vue-tsc": "^2.1.8"
   },
   "packageManager": "pnpm@9.11.0"
 }

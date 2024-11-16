@@ -1,10 +1,19 @@
 <template>
-  <el-page-header title="VQA数据集查看系统" :icon="null" style="padding: 16px">
+  <el-page-header
+    title="VQA数据集查看系统"
+    :icon="undefined"
+    style="padding: 16px"
+  >
     <template #content>
       <el-button>查看系统说明</el-button>
     </template>
     <template #extra>
       <div class="flex items-center">
+        <el-button v-if="!isLoggedIn" type="primary" @click="showLogin">
+          登录
+        </el-button>
+        <el-button v-else @click="handleLogout">退出登录</el-button>
+        <span>&emsp;</span>
         <span
           >{{
             currentFileName
@@ -41,7 +50,7 @@
             }}</el-button>
           </template>
         </el-upload>
-        <el-button type="primary">保存</el-button>
+        <el-button type="primary" @click="handleSave">保存</el-button>
       </div>
     </template>
   </el-page-header>
@@ -89,16 +98,27 @@
           label="翻译"
           min-width="200"
         />
+        <el-table-column property="user" label="操作人" width="100" />
+        <el-table-column property="updatedAt" label="更新时间" width="160" />
       </el-table>
     </el-card>
   </div>
   <el-card style="margin-top: 16px">
     <div id="image"></div>
   </el-card>
+  <el-dialog
+    v-model="loginVisible"
+    :title="isLoggedIn ? '用户设置' : '用户登录'"
+    width="520px"
+    :close-on-click-modal="false"
+    destroy-on-close
+  >
+    <Login @login-success="handleLoginSuccess" />
+  </el-dialog>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   ElTable,
   ElTableColumn,
@@ -112,10 +132,12 @@ import {
   ElFormItem,
   ElInput,
   ElCard,
+  ElMessage,
 } from "element-plus";
 import type { UploadProps } from "element-plus";
 import { IMG_FOLDER_PATH, BOX_PATH } from "./config";
 import { parseCSVRow, type TableRow } from "./utils";
+import Login from "./components/Login.vue";
 
 // 上传文件
 const fileList = ref<File[]>([]);
@@ -172,6 +194,11 @@ const selectQuestion = (row: TableRow) => {
   formData.value.vgGuide = row.vgGuide;
 };
 
+interface BBox {
+  type: string;
+  bbox2d: number[];
+}
+
 const formData = ref<{
   question: string;
   answer: string;
@@ -188,38 +215,34 @@ const formData = ref<{
  * 绘制图片
  * @param name 图片名称
  */
+const imageElement = ref<HTMLImageElement>();
 function displayImage(name: string) {
-  var boxDom = document.getElementById("image");
+  let boxDom = document.getElementById("image");
   if (!boxDom) return;
   boxDom.innerHTML = "";
 
   // 清空图像路径
-  const imageElement = document.createElement("img");
-  imageElement.style.objectFit = "scale-down";
-  imageElement.style.width = "100%";
+  imageElement.value = document.createElement("img");
+  imageElement.value.style.objectFit = "scale-down";
+  imageElement.value.style.width = "100%";
 
   const imagePath = IMG_FOLDER_PATH + name;
   console.log("load", imagePath); // 在控制台打印图像路径
-  imageElement.src = imagePath;
-  boxDom.appendChild(imageElement);
+  imageElement.value.src = imagePath;
+  boxDom.appendChild(imageElement.value);
 
   // 在图像加载后绘制边界框
-  imageElement.onload = () => {
-    loadBboxes(name, imageElement);
+  imageElement.value.onload = () => {
+    loadBboxes(name);
   };
 }
 
 // 读取边界框数据
-interface BBox {
-  type: string;
-  bbox2d: number[];
-}
-let bboxes: BBox[] = [];
-function loadBboxes(name: string, imageElement: HTMLImageElement) {
+const bboxes = ref<BBox[]>([]);
+function loadBboxes(name: string) {
   const bbox_Path = `${
     BOX_PATH + name.replace(/\.(jpg|jpeg|png|gif|bmp|tiff|webp)$/i, "")
   }.txt`;
-  debugger;
 
   // 自动加载之前的标注数据
   // if (annotations[name]) {
@@ -229,33 +252,36 @@ function loadBboxes(name: string, imageElement: HTMLImageElement) {
   fetch(bbox_Path)
     .then((response) => response.text())
     .then((data) => {
-      bboxes = [];
       const lines = data.split("\n");
       lines.forEach((line) => {
+        bboxes.value = [];
         const parts = line.trim().split(" ");
         if (parts.length >= 14) {
           const bboxData = {
             type: parts[0],
             bbox2d: parts.slice(4, 8).map(Number),
           };
-          bboxes.push(bboxData);
+          bboxes.value.push(bboxData);
         }
       });
-      drawBboxes(imageElement);
+      drawBboxes();
     })
     .catch((error) => console.error("Error loading bounding boxes:", error));
 }
 
 // 绘制边界框
 let scale = 1; // 初始缩放比例
-function drawBboxes(imageElement: HTMLImageElement) {
-  const bboxesContainer = document.createElement("div");
+function drawBboxes() {
+  const bboxesContainer = document.querySelector("#image");
+  if (!bboxesContainer || !imageElement.value) {
+    console.error("can not find bboxesContainer or imageElement");
+    return;
+  }
+  // 获取缩放后的实际位置和大小
+  const imgRect = imageElement.value.getBoundingClientRect();
+  scale = imgRect.width / imageElement.value.naturalWidth;
 
-  const imgRect = imageElement.getBoundingClientRect(); // 获取缩放后的实际位置和大小
-  const imgLeft = imgRect.left; // 获取缩放后的左边位置
-  const imgTop = imgRect.top; // 获取缩放后的上边位置
-
-  bboxes.forEach((bbox) => {
+  bboxes.value.forEach((bbox) => {
     const [x1, y1, x2, y2] = bbox.bbox2d;
 
     // 计算边界框的宽度和高度
@@ -263,8 +289,8 @@ function drawBboxes(imageElement: HTMLImageElement) {
     const bboxHeight = (y2 - y1) * scale;
 
     // 计算边界框的左上角位置
-    const left = imgLeft + x1 * scale;
-    const top = imgTop + y1 * scale;
+    const left = x1 * scale;
+    const top = y1 * scale;
 
     // 创建并设置边界框元素
     const bboxElement = document.createElement("div");
@@ -275,7 +301,7 @@ function drawBboxes(imageElement: HTMLImageElement) {
     bboxElement.style.height = `${bboxHeight}px`;
 
     // 如果边界框在选中列表中，添加选中样式
-    //if (selectedBboxes.includes(bbox)) {
+    // if (selectedBboxes.includes(bbox)) {
     if (
       formData.value.selectedBboxes.some(
         (b) => JSON.stringify(b) === JSON.stringify(bbox)
@@ -296,7 +322,7 @@ function drawBboxes(imageElement: HTMLImageElement) {
     // 添加点击事件监听器
     bboxElement.addEventListener("click", (event) => {
       event.stopPropagation(); // 阻止事件冒泡到图片
-      handleBboxClick(bbox, imageElement); // 调用外部处理程序
+      handleBboxClick(bbox); // 调用外部处理程序
     });
 
     // 添加到容器中
@@ -306,7 +332,7 @@ function drawBboxes(imageElement: HTMLImageElement) {
 }
 
 // 定义点击事件处理程序
-function handleBboxClick(bbox: BBox, imageElement: HTMLImageElement) {
+function handleBboxClick(bbox: BBox) {
   // 使用深度比较来检查边界框是否已被选中
   const isSelected = formData.value.selectedBboxes.some(
     (selectedBbox) =>
@@ -327,13 +353,131 @@ function handleBboxClick(bbox: BBox, imageElement: HTMLImageElement) {
     formData.value.selectedBboxes.push(bbox); // 添加到选择列表
   }
 
-  drawBboxes(imageElement); // 重新绘制边界框
+  drawBboxes(); // 重新绘制边界框
 }
+
+// 添加登录相关的状态管理
+const loginVisible = ref(false);
+const isLoggedIn = ref(false);
+
+// 显示登录对话框
+const showLogin = () => {
+  loginVisible.value = true;
+};
+
+// 处理登录成功
+const handleLoginSuccess = () => {
+  isLoggedIn.value = true;
+  loginVisible.value = false;
+  ElMessage.success("登录成功");
+};
+
+// 处理退出登录
+const handleLogout = () => {
+  ElMessageBox.confirm("确定要退出登录吗？", "提示", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      isLoggedIn.value = false;
+      ElMessage.success("已退出登录");
+    })
+    .catch(() => {});
+};
+
+// 保存表单数据
+const saveFormData = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      ElMessage.warning("请先登录");
+      showLogin();
+      return;
+    }
+
+    const response = await fetch("http://localhost:3000/api/form/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        ...formData.value,
+        imageFileName: currentFileName.value,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      ElMessage.success("保存成功");
+      // 刷新表单数据
+      await loadFormData();
+    } else {
+      ElMessage.error(data.message || "保存失败");
+    }
+  } catch (error) {
+    ElMessage.error("服务器错误");
+  }
+};
+
+// 加载表单数据
+const loadFormData = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const response = await fetch(
+      `http://localhost:3000/api/form?imageFileName=${currentFileName.value}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // 更新表格数据
+      tableData.value = data.map((item: any) => ({
+        question: item.question,
+        answer: item.answer,
+        vgGuide: item.vgGuide,
+        user: item.user.username,
+        updatedAt: new Date(item.updatedAt).toLocaleString(),
+      }));
+    }
+  } catch (error) {
+    console.error("加载数据失败:", error);
+  }
+};
+
+// 在图片改变时加载数据
+watch(currentFileName, () => {
+  loadFormData();
+});
+
+// 修改保存按钮的点击事件
+const handleSave = () => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning("请先登录");
+    showLogin();
+    return;
+  }
+  saveFormData();
+};
 
 onMounted(() => {
   // 初始化时设置当前数目
   const current_num = Number(localStorage.getItem("current_num"));
   if (current_num && !Number.isNaN(current_num)) num.value = current_num;
+  window.addEventListener("resize", drawBboxes);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", drawBboxes);
 });
 </script>
 
@@ -349,5 +493,29 @@ onMounted(() => {
 
 .el-card {
   border-radius: 8px;
+}
+
+#image {
+  width: 100%;
+  position: relative;
+}
+
+.bbox {
+  position: absolute;
+  border: 2px solid red;
+  /* pointer-events: none; */ /* 移除这个属性 */
+}
+.bbox-label {
+  position: absolute;
+  color: white; /* 文本颜色 */
+  background-color: rgba(0, 0, 0, 0.7); /* 背景颜色 */
+  padding: 2px 4px; /* 内边距 */
+  border-radius: 3px; /* 圆角 */
+  font-size: 12px; /* 字体大小 */
+  transform: translateY(-100%); /* 上移文本 */
+}
+.bbox.selected {
+  border-color: rgb(0, 30, 255); /* 选中时的边框颜色 */
+  /*pointer-events: auto;  允许点击事件 */
 }
 </style>
