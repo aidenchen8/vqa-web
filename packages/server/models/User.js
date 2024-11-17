@@ -1,5 +1,6 @@
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+/* eslint-disable no-invalid-this */
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
@@ -11,6 +12,10 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
+    },
+    lastEditedFile: {
+      type: String,
+      default: "",
     },
   },
   {
@@ -33,4 +38,4 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 const User = mongoose.model("User", userSchema);
-module.exports = User;
+export default User;

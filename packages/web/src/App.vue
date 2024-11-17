@@ -1,18 +1,8 @@
 <template>
-  <el-page-header
-    title="VQA数据集查看系统"
-    :icon="undefined"
-    style="padding: 16px"
-  >
-    <template #content>
-      <el-button>查看系统说明</el-button>
-    </template>
+  <!-- @vue-expect-error -->
+  <el-page-header title="VQA标注系统" :icon="null" style="padding: 16px">
     <template #extra>
       <div class="flex items-center">
-        <el-button v-if="!isLoggedIn" type="primary" @click="showLogin">
-          登录
-        </el-button>
-        <el-button v-else @click="handleLogout">退出登录</el-button>
         <span>&emsp;</span>
         <span
           >{{
@@ -51,24 +41,15 @@
           </template>
         </el-upload>
         <el-button type="primary" @click="handleSave">保存</el-button>
+        <el-button v-if="!isLoggedIn" type="primary" @click="showLogin">
+          登录
+        </el-button>
+        <el-button v-else @click="handleLogout">退出登录</el-button>
       </div>
     </template>
   </el-page-header>
-  <div class="flex">
-    <el-card style="width: 400px">
-      <el-form ref="formRef" :model="formData" label-width="50px">
-        <el-form-item label="Q:" prop="question">
-          <el-input v-model="formData.question" type="textarea"></el-input>
-        </el-form-item>
-        <el-form-item label="A:" prop="answer">
-          <el-input v-model="formData.answer" type="textarea"></el-input>
-        </el-form-item>
-        <el-form-item label="VG:" prop="vgGuide">
-          <el-input v-model="formData.vgGuide" type="textarea"></el-input>
-        </el-form-item>
-      </el-form>
-    </el-card>
-    <el-card style="margin-left: 16px">
+  <div class="flex main-container">
+    <el-card class="table-container">
       <el-table :data="tableData" style="width: 100%">
         <el-table-column type="index" width="50" />
         <el-table-column property="question" label="问题" min-width="280">
@@ -102,6 +83,19 @@
         <el-table-column property="updatedAt" label="更新时间" width="160" />
       </el-table>
     </el-card>
+    <el-card class="form-container">
+      <el-form ref="formRef" :model="formData" label-width="30px">
+        <el-form-item label="Q:" prop="question">
+          <el-input v-model="formData.question" type="textarea"></el-input>
+        </el-form-item>
+        <el-form-item label="A:" prop="answer">
+          <el-input v-model="formData.answer" type="textarea"></el-input>
+        </el-form-item>
+        <el-form-item label="VG:" prop="vgGuide">
+          <el-input v-model="formData.vgGuide" type="textarea"></el-input>
+        </el-form-item>
+      </el-form>
+    </el-card>
   </div>
   <el-card style="margin-top: 16px">
     <div id="image"></div>
@@ -118,7 +112,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   ElTable,
   ElTableColumn,
@@ -133,10 +127,11 @@ import {
   ElInput,
   ElCard,
   ElMessage,
+  ElDialog,
 } from "element-plus";
 import type { UploadProps } from "element-plus";
 import { IMG_FOLDER_PATH, BOX_PATH } from "./config";
-import { parseCSVRow, type TableRow } from "./utils";
+import { type TableRow } from "./utils";
 import Login from "./components/Login.vue";
 
 // 上传文件
@@ -156,33 +151,141 @@ function handleUpload(e: Event) {
   }
 }
 
-// 存储所有数据的 Map
-const questionsMap = ref<Record<string, TableRow[]>>();
-// 存储 index 到 filename 的映射
-const fileIndexMap = ref<string[]>([]);
-const maxNum = computed(() => fileIndexMap.value.length);
+const maxNum = ref(0);
 const tableData = ref<TableRow[]>([]);
 
-const handleExceed: UploadProps["onExceed"] = (files: File[]) => {
+const handleExceed: UploadProps["onExceed"] = async (files: File[]) => {
   const file = files[0];
   if (!file) return;
-  fileList.value = files;
-  parseCSVRow(file, (dataMap, indexArray) => {
-    questionsMap.value = dataMap;
-    fileIndexMap.value = indexArray;
-    onNumChange();
-  });
+  await uploadCSVToServer(file);
 };
 
 // 当前题目序号
 const num = ref(2866);
 // 当前图片文件名
-const currentFileName = computed(() => fileIndexMap.value[num.value]);
-function onNumChange(): void {
-  tableData.value = questionsMap.value?.[currentFileName.value!] || [];
-  displayImage(currentFileName.value);
-  localStorage.setItem("current_num", String(num.value));
-}
+const currentFileName = ref<string>("");
+
+// 获取统计信息
+const loadStats = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const response = await fetch("http://localhost:3000/api/form/stats", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      const { totalQuestions, completedQuestions } = await response.json();
+      maxNum.value = totalQuestions;
+      // 可以显示完成进度
+      console.log(`已完成: ${completedQuestions}/${totalQuestions}`);
+    }
+  } catch (error) {
+    console.error("获取统计信息失败:", error);
+  }
+};
+
+// 加载表单数据
+const loadFormData = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const response = await fetch(
+      `http://localhost:3000/api/form/query?fileName=${currentFileName.value}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (response.ok) {
+      const { data } = await response.json();
+      tableData.value = data.map((item: any) => ({
+        questionId: item.questionId,
+        question: item.question,
+        answer: item.answer,
+        vgGuide: item.vgGuide,
+        user: item.user.username,
+        updatedAt: new Date(item.updatedAt).toLocaleString(),
+      }));
+    }
+  } catch (error) {
+    console.error("加载数据失败:", error);
+  }
+};
+
+// 获取最后编辑的文件
+const loadLastEdited = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const response = await fetch("http://localhost:3000/api/form/last-edited", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      const { lastEditedFile } = await response.json();
+      if (lastEditedFile) {
+        currentFileName.value = lastEditedFile;
+        await loadFormData();
+      }
+    }
+  } catch (error) {
+    console.error("获取最后编辑记录失败:", error);
+  }
+};
+
+// 修改题号变化处理
+const onNumChange = async () => {
+  const response = await fetch(
+    `http://localhost:3000/api/form/query?questionId=${num.value}`,
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    }
+  );
+
+  if (response.ok) {
+    const { data } = await response.json();
+    if (data.length > 0) {
+      currentFileName.value = data[0].imageFileName;
+      await loadFormData();
+      displayImage(currentFileName.value);
+    }
+  }
+};
+
+// 组件挂载时初始化
+onMounted(async () => {
+  if (localStorage.getItem("token")) {
+    await loadStats();
+    await loadLastEdited();
+  }
+});
+
+// 监听登录状态变化
+watch(
+  () => isLoggedIn.value,
+  async (newValue) => {
+    if (newValue) {
+      await loadStats();
+      await loadLastEdited();
+    } else {
+      // 清空数据
+      tableData.value = [];
+      currentFileName.value = "";
+    }
+  }
+);
 
 // 表格当前行
 const currentRow = ref();
@@ -387,7 +490,7 @@ const handleLogout = () => {
 };
 
 // 保存表单数据
-const saveFormData = async () => {
+const handleSave = async () => {
   try {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -422,59 +525,59 @@ const saveFormData = async () => {
   }
 };
 
-// 加载表单数据
-const loadFormData = async () => {
+// 上传CSV文件到服务器
+const uploadCSVToServer = async (file: File, forceUpdate = false) => {
   try {
     const token = localStorage.getItem("token");
-    if (!token) return;
+    if (!token) {
+      ElMessage.warning("请先登录");
+      return;
+    }
 
-    const response = await fetch(
-      `http://localhost:3000/api/form?imageFileName=${currentFileName.value}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    // 读取文件内容
+    const fileContent = await file.text();
+
+    const response = await fetch("http://localhost:3000/api/csv/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        fileContent,
+        forceUpdate,
+      }),
+    });
 
     const data = await response.json();
 
     if (response.ok) {
-      // 更新表格数据
-      tableData.value = data.map((item: any) => ({
-        question: item.question,
-        answer: item.answer,
-        vgGuide: item.vgGuide,
-        user: item.user.username,
-        updatedAt: new Date(item.updatedAt).toLocaleString(),
-      }));
+      if (data.requireConfirmation) {
+        // 需要确认是否覆盖
+        ElMessageBox.confirm("题目数据将被覆盖，是否继续？", "警告", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning",
+        })
+          .then(() => {
+            // 用户确认覆盖，重新上传
+            uploadCSVToServer(file, true);
+          })
+          .catch(() => {
+            ElMessage.info("已取消上传");
+            fileList.value = []; // 清空文件选择
+          });
+      } else if (data.status === "success") {
+        ElMessage.success("CSV文件上传成功");
+      }
+    } else {
+      ElMessage.error(data.message || "CSV文件上传失败");
     }
   } catch (error) {
-    console.error("加载数据失败:", error);
+    console.error("上传CSV数据失败:", error);
+    ElMessage.error("上传失败");
   }
 };
-
-// 在图片改变时加载数据
-watch(currentFileName, () => {
-  loadFormData();
-});
-
-// 修改保存按钮的点击事件
-const handleSave = () => {
-  if (!isLoggedIn.value) {
-    ElMessage.warning("请先登录");
-    showLogin();
-    return;
-  }
-  saveFormData();
-};
-
-onMounted(() => {
-  // 初始化时设置当前数目
-  const current_num = Number(localStorage.getItem("current_num"));
-  if (current_num && !Number.isNaN(current_num)) num.value = current_num;
-  window.addEventListener("resize", drawBboxes);
-});
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", drawBboxes);
@@ -517,5 +620,23 @@ onBeforeUnmount(() => {
 .bbox.selected {
   border-color: rgb(0, 30, 255); /* 选中时的边框颜色 */
   /*pointer-events: auto;  允许点击事件 */
+}
+
+.table-container {
+}
+
+.form-container {
+  margin-left: 16px;
+  width: 400px;
+}
+
+@media screen and (max-width: 768px) {
+  .main-container {
+    flex-direction: column;
+  }
+  .form-container {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 </style>

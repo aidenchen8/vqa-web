@@ -1,9 +1,17 @@
-const express = require("express");
+import express from "express";
+import {
+  saveFormData,
+  queryFormData,
+  getStats,
+  getLastEdited,
+} from "../controllers/formController.js";
+import { protect } from "../middleware/auth.js";
+
 const router = express.Router();
-const { saveFormData, getFormData } = require("../controllers/formController");
-const { protect } = require("../middleware/auth");
 
+router.get("/stats", protect, getStats);
+router.get("/query", protect, queryFormData);
 router.post("/save", protect, saveFormData);
-router.get("/", protect, getFormData);
+router.get("/last-edited", protect, getLastEdited);
 
-module.exports = router;
+export default router;

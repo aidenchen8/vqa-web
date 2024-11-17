@@ -1,15 +1,13 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
-// 生成JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
 };
 
-// 用户登录
-const loginUser = async (req, res) => {
+export const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
@@ -28,8 +26,7 @@ const loginUser = async (req, res) => {
   }
 };
 
-// 修改密码
-const changePassword = async (req, res) => {
+export const changePassword = async (req, res) => {
   try {
     const { username, oldPassword, newPassword } = req.body;
     const user = await User.findOne({ username });
@@ -46,12 +43,11 @@ const changePassword = async (req, res) => {
   }
 };
 
-// 验证token
-const verifyToken = async (req, res) => {
+export const verifyToken = async (req, res) => {
   res.json({ user: req.user });
 };
 
-module.exports = {
+export default {
   loginUser,
   changePassword,
   verifyToken,

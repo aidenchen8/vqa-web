@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const bboxSchema = new mongoose.Schema({
   type: String,
@@ -31,9 +31,9 @@ const formDataSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // 自动添加 createdAt 和 updatedAt 字段
+    timestamps: true,
   }
 );
 
 const FormData = mongoose.model("FormData", formDataSchema);
-module.exports = FormData;
+export default FormData;

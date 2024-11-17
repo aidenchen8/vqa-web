@@ -82,7 +82,7 @@
 <script setup lang="ts">
 import { ref, reactive } from "vue";
 import type { FormInstance, FormRules } from "element-plus";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElForm, ElFormItem, ElButton, ElInput } from "element-plus";
 
 // 添加 emit 定义
 const emit = defineEmits<{
@@ -205,7 +205,6 @@ const handleChangePassword = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #f5f5f5;
 }
 
 .login-card {
