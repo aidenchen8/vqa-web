@@ -8,34 +8,42 @@ const users = [
   {
     username: "admin",
     password: "admin123",
+    roles: ["admin", "user"],
   },
   {
     username: "a1",
-    password: "a1_vqa",
+    password: "user123",
+    roles: ["a1"],
   },
   {
     username: "a2",
-    password: "a2_vqa",
+    password: "user123",
+    roles: ["a2"],
   },
   {
     username: "b1",
-    password: "b1_vqa",
+    password: "user123",
+    roles: ["b1"],
   },
   {
     username: "b2",
-    password: "b2_vqa",
+    password: "user123",
+    roles: ["b2"],
   },
   {
     username: "c1",
-    password: "c1_vqa",
+    password: "user123",
+    roles: ["c1"],
   },
   {
     username: "c2",
-    password: "c2_vqa",
+    password: "user123",
+    roles: ["c2"],
   },
   {
     username: "val",
-    password: "val_vqa",
+    password: "user123",
+    roles: ["val"],
   },
 ];
 

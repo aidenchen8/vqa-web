@@ -80,13 +80,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import type { FormInstance, FormRules } from "element-plus";
 import { ElMessage, ElForm, ElFormItem, ElButton, ElInput } from "element-plus";
+import JSEncrypt from "jsencrypt";
+import type { UserInfo } from "../types";
 
 // 添加 emit 定义
 const emit = defineEmits<{
-  (e: "loginSuccess"): void;
+  (e: "loginSuccess", userInfo: UserInfo): void;
 }>();
 
 // 控制显示登录还是修改密码表单
@@ -136,26 +138,60 @@ const passwordRules: FormRules = {
   ],
 };
 
+const publicKey = ref("");
+const encryptor = new JSEncrypt();
+
+// 获取公钥
+const getPublicKey = async () => {
+  try {
+    const response = await fetch("http://localhost:3000/api/users/public-key");
+    const data = await response.json();
+    publicKey.value = data.publicKey;
+    encryptor.setPublicKey(publicKey.value);
+  } catch (error) {
+    console.error("获取公钥失败:", error);
+  }
+};
+
+onMounted(() => {
+  getPublicKey();
+});
+
 // 登录处理
 const handleLogin = async () => {
   if (!loginFormRef.value) return;
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
+        // 加密密码
+        const encryptedPassword = encryptor.encrypt(loginForm.password);
+
         const response = await fetch("http://localhost:3000/api/users/login", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(loginForm),
+          body: JSON.stringify({
+            username: loginForm.username,
+            encryptedPassword,
+          }),
         });
 
         const data = await response.json();
 
         if (response.ok) {
           localStorage.setItem("token", data.token);
+          localStorage.setItem(
+            "userInfo",
+            JSON.stringify({
+              id: data.id,
+              username: data.username,
+              roles: data.roles,
+            })
+          );
+
           ElMessage.success("登录成功");
-          emit("loginSuccess");
+          emit("loginSuccess", data);
         } else {
           ElMessage.error(data.message || "登录失败");
         }

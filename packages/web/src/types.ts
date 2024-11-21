@@ -5,3 +5,10 @@ export interface TableRow {
   vgGuide: string;
   vgGuideTranslation: string;
 }
+
+export interface UserInfo {
+  id: string;
+  username: string;
+  roles: string[];
+  token: string;
+}

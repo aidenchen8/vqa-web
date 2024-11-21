@@ -112,7 +112,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch, computed } from "vue";
 import {
   ElTable,
   ElTableColumn,
@@ -130,8 +130,8 @@ import {
   ElDialog,
 } from "element-plus";
 import type { UploadProps } from "element-plus";
-import { IMG_FOLDER_PATH, BOX_PATH } from "./config";
-import { type TableRow } from "./utils";
+import { getFilePath } from "./config";
+import { type TableRow } from "./types";
 import Login from "./components/Login.vue";
 
 // 上传文件
@@ -329,7 +329,7 @@ function displayImage(name: string) {
   imageElement.value.style.objectFit = "scale-down";
   imageElement.value.style.width = "100%";
 
-  const imagePath = IMG_FOLDER_PATH + name;
+  const imagePath = getFilePath(userInfo.value?.roles!, "img") + name;
   console.log("load", imagePath); // 在控制台打印图像路径
   imageElement.value.src = imagePath;
   boxDom.appendChild(imageElement.value);
@@ -344,7 +344,8 @@ function displayImage(name: string) {
 const bboxes = ref<BBox[]>([]);
 function loadBboxes(name: string) {
   const bbox_Path = `${
-    BOX_PATH + name.replace(/\.(jpg|jpeg|png|gif|bmp|tiff|webp)$/i, "")
+    getFilePath(userInfo.value?.roles!, "box") +
+    name.replace(/\.(jpg|jpeg|png|gif|bmp|tiff|webp)$/i, "")
   }.txt`;
 
   // 自动加载之前的标注数据
@@ -468,10 +469,27 @@ const showLogin = () => {
   loginVisible.value = true;
 };
 
+// 用户信息
+const userInfo = ref<{
+  id: string;
+  username: string;
+  roles: string[];
+} | null>(null);
+
+// 检查用户是否有特定权限
+const hasPermission = (permission: string) => {
+  return userInfo.value?.roles.includes(permission);
+};
+
 // 处理登录成功
-const handleLoginSuccess = () => {
+const handleLoginSuccess = (data: any) => {
   isLoggedIn.value = true;
   loginVisible.value = false;
+  userInfo.value = {
+    id: data.id,
+    username: data.username,
+    roles: data.roles,
+  };
   ElMessage.success("登录成功");
 };
 
@@ -484,10 +502,24 @@ const handleLogout = () => {
   })
     .then(() => {
       isLoggedIn.value = false;
+      userInfo.value = null;
+      localStorage.removeItem("token");
+      localStorage.removeItem("userInfo");
       ElMessage.success("已退出登录");
     })
     .catch(() => {});
 };
+
+// 组件挂载时初始化用户信息
+onMounted(() => {
+  const storedUserInfo = localStorage.getItem("userInfo");
+  if (storedUserInfo) {
+    userInfo.value = JSON.parse(storedUserInfo);
+    isLoggedIn.value = true;
+  } else {
+    showLogin();
+  }
+});
 
 // 保存表单数据
 const handleSave = async () => {

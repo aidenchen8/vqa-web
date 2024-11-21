@@ -13,6 +13,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    roles: {
+      type: [String],
+      default: ["user"],
+      enum: ["admin", "user", "a1", "a2", "b1", "b2", "c1", "c2", "val"],
+    },
     lastEditedFile: {
       type: String,
       default: "",

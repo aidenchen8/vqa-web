@@ -1,15 +1,17 @@
 import express from "express";
 import {
   loginUser,
-  changePassword,
-  verifyToken,
+  getPublicKey,
+  updateUser,
+  updateUserRoles,
 } from "../controllers/userController.js";
-import { protect } from "../middleware/auth.js";
+import { protect, hasRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+router.get("/public-key", getPublicKey);
 router.post("/login", loginUser);
-router.post("/change-password", changePassword);
-router.get("/verify", protect, verifyToken);
+router.put("/update", protect, updateUser);
+router.put("/update-roles", protect, hasRole("admin"), updateUserRoles);
 
 export default router;
