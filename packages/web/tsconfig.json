@@ -1,6 +1,12 @@
 {
   "extends": "@vue/tsconfig/tsconfig.json",
-  "include": ["env.d.ts", "src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "include": [
+    "env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "auto-imports.d.ts"
+  ],
   "exclude": ["node_modules", "dist", "packages/web/src/**/__tests__/*"],
   "compilerOptions": {
     "target": "esnext",
@@ -16,6 +22,7 @@
     "sourceMap": true,
     "baseUrl": ".",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["./components.d.ts", "./auto-imports.d.ts"],
     // Set to empty to avoid accidental inclusion of unwanted types
     "paths": {
       "@/*": ["src/*"]

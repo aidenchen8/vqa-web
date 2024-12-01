@@ -9,10 +9,10 @@
     "preview": "pnpm -C packages/web preview",
     "serve": "pnpm -C packages/server dev"
   },
-  "dependencies": {},
   "devDependencies": {
     "@babel/core": "~7.25.2",
     "@babel/eslint-parser": "~7.25.1",
+    "@babel/plugin-syntax-import-assertions": "^7.26.0",
     "@types/papaparse": "^5.3.15",
     "eslint": "^9.14.0",
     "eslint-plugin-react": "~7.37.0",

@@ -1,19 +1,21 @@
-import base from './eslint/index.js'
-import vue from './eslint/vue.js'
-import ts from './eslint/typescript.js'
+import base from "./eslint/index.js";
+import vue from "./eslint/vue.js";
+import ts from "./eslint/typescript.js";
 
-import babelParser from '@babel/eslint-parser'
+import babelParser from "@babel/eslint-parser";
 import vueParser from "vue-eslint-parser";
 import tseslint from "typescript-eslint";
 
-const tsParser = tseslint.parser
+import eslintrcImport from "./packages/web/.eslintrc-auto-import.json" assert { type: "json" };
+
+const tsParser = tseslint.parser;
 
 export default [
   base,
   vue,
   ts,
   {
-    ignores: ['**/node_modules', '**/dist', 'src/assets/**', '**/*.json'],
+    ignores: ["**/node_modules", "**/dist", "**/assets/**", "**/*.json"],
     languageOptions: {
       parser: vueParser,
       parserOptions: {
@@ -26,10 +28,11 @@ export default [
         },
         babelOptions: {
           parserOpts: {
-            plugins: ['jsx'], 
+            plugins: ["jsx", "importAssertions"],
           },
         },
       },
+      ...eslintrcImport,
     },
     rules: {},
   },

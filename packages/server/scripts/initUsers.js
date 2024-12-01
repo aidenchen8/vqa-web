@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 
 dotenv.config();
@@ -57,18 +58,46 @@ const initUsers = async () => {
     console.log("已清除现有用户数据");
 
     // 创建新用户
-    const createdUsers = await User.create(users);
-    console.log("已创建以下用户：");
-    createdUsers.forEach((user) => {
-      console.log(`- ${user.username}`);
-    });
+    const createdUsers = [];
+    for (const userData of users) {
+      try {
+        // 生成盐值
+        const salt = await bcrypt.genSalt(10);
+        // 使用盐值加密密码
+        const hashedPassword = await bcrypt.hash(userData.password, salt);
 
-    console.log("用户初始化完成");
-    process.exit();
+        // 创建用户
+        const user = await User.create({
+          username: userData.username,
+          password: hashedPassword,
+          roles: userData.roles,
+        });
+
+        createdUsers.push(user);
+        console.log(
+          `✓ 创建用户成功: ${user.username}, 角色: ${user.roles.join(", ")}`
+        );
+      } catch (error) {
+        console.error(`✗ 创建用户失败: ${userData.username}`, error.message);
+      }
+    }
+
+    console.log("\n用户初始化完成");
+    console.log(`成功创建 ${createdUsers.length} 个用户`);
+    console.log(`失败 ${users.length - createdUsers.length} 个用户`);
+
+    await mongoose.disconnect();
+    process.exit(0);
   } catch (error) {
     console.error("初始化用户失败:", error);
     process.exit(1);
   }
 };
+
+// 添加错误处理
+process.on("unhandledRejection", (error) => {
+  console.error("未处理的 Promise 拒绝:", error);
+  process.exit(1);
+});
 
 initUsers();

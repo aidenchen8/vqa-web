@@ -1,19 +1,25 @@
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import { TokenService } from "../services/tokenService.js";
 
 export const protect = async (req, res, next) => {
   try {
-    let token = req.headers.authorization?.split(" ")[1];
+    const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({ message: "未授权，请先登录" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select("-password");
+    const decoded = TokenService.verifyToken(token, "access");
+    req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: "未授权，token无效" });
+    if (error.name === "TokenExpiredError") {
+      res.status(401).json({
+        message: "令牌已过期",
+        code: "TOKEN_EXPIRED",
+      });
+    } else {
+      res.status(401).json({ message: "无效的令牌" });
+    }
   }
 };
 
