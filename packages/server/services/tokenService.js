@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -40,5 +41,15 @@ export class TokenService {
   static verifyToken(token, type = "access") {
     const secret = type === "access" ? JWT_SECRET : JWT_REFRESH_SECRET;
     return jwt.verify(token, secret);
+  }
+
+  static async getUserFromToken(token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await User.findById(decoded.id);
+      return user;
+    } catch (error) {
+      throw new Error("无效的认证令牌");
+    }
   }
 }

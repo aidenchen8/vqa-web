@@ -1,14 +1,15 @@
 import { ElMessage } from "element-plus";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createWebHistory, createRouter } from "vue-router";
 import { AuthService } from "../services/authService";
 import { useStore } from "@/store";
 
 const routes = [
+  { path: "/:catchAll(.*)", redirect: "/error/404" },
+  { path: "/error/:code", component: () => import("@/views/Error.vue") },
   {
     path: "/",
     component: () => import("@/views/Home.vue"),
     redirect: "/vqa",
-    meta: { auth: "user" },
     children: [
       {
         path: "/vqa",
@@ -28,7 +29,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createMemoryHistory(),
+  history: createWebHistory(),
   routes,
 });
 
@@ -40,7 +41,6 @@ router.beforeEach(async (to, from, next) => {
     const isAuthenticated = await AuthService.refreshTokenIfNeeded();
 
     if (!isAuthenticated) {
-      ElMessage.warning("请先登录");
       next({
         path: "/login",
         query: { redirect: to.fullPath }, // 保存原目标路径
@@ -48,19 +48,14 @@ router.beforeEach(async (to, from, next) => {
       return;
     }
 
-    // TODO: 检查用户信息
+    // 检查用户信息
     const store = useStore();
     if (!store.userInfo) {
+      AuthService.getUser();
     }
   }
 
   next();
-});
-
-// 路由错误处理
-router.onError((error) => {
-  console.error("路由错误:", error);
-  router.push("/");
 });
 
 export default router;

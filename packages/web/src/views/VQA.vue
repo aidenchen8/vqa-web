@@ -26,27 +26,26 @@
             <span>题</span>
           </template>
         </el-input-number>
-        <el-upload
-          v-model="fileList"
-          :limit="1"
-          :auto-upload="false"
-          :show-file-list="false"
-          :on-exceed="handleExceed"
-          style="margin: 0 16px"
-        >
-          <template #trigger>
-            <el-button @click="handleUpload">{{
-              fileList.length ? fileList[0].name : "上传文件"
-            }}</el-button>
-          </template>
-        </el-upload>
+
         <el-button type="primary" @click="handleSave">保存</el-button>
-        <el-dropdown placement="bottom-end">
+        <el-dropdown placement="bottom-end" style="margin-left: 16px">
           <el-button> {{ store.userInfo?.username }} </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="logout">退出登录</el-dropdown-item>
+              <el-dropdown-item @click="AuthService.logout"
+                >退出登录</el-dropdown-item
+              >
               <el-dropdown-item>修改用户信息</el-dropdown-item>
+              <el-dropdown-item @click="fileInput?.click()">
+                上传文件
+                <input
+                  ref="fileInput"
+                  type="file"
+                  style="display: none"
+                  accept=".csv"
+                  @change="handleUpload"
+                />
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -91,8 +90,6 @@
             min-width="200"
             show-overflow-tooltip
           />
-          <el-table-column property="user" label="操作人" width="100" />
-          <el-table-column property="updatedAt" label="更新时间" width="160" />
         </el-table>
       </el-card>
       <el-card class="form-container">
@@ -118,39 +115,16 @@
 <script lang="ts" setup>
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { ElMessageBox, ElMessage } from "element-plus";
-import { type UploadProps } from "element-plus";
 import { getFilePath } from "@/utils/config";
-import { logout } from "@/utils/authHooks";
+import { AuthService } from "@/services/authService";
 import { useStore } from "@/store";
-import { type TableRow } from "@/types";
+import type { FormDataItem, BBox } from "@/types";
+import { api } from "@/utils/http";
 
 const store = useStore();
 
-// 上传文件
-const fileList = ref<File[]>([]);
-
-function handleUpload(e: Event) {
-  if (fileList.value.length > 0) {
-    e.preventDefault();
-    e.stopPropagation();
-    ElMessageBox.confirm("是否删除当前文件？", "警告", {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning",
-    }).then(() => {
-      fileList.value = [];
-    });
-  }
-}
-
 const maxNum = ref(0);
-const tableData = ref<TableRow[]>([]);
-
-const handleExceed: UploadProps["onExceed"] = async (files: File[]) => {
-  const file = files[0];
-  if (!file) return;
-  await uploadCSVToServer(file);
-};
+const tableData = ref<FormDataItem[]>([]);
 
 // 当前题目序号
 const num = ref(2866);
@@ -160,21 +134,9 @@ const currentFileName = ref<string>("");
 // 获取统计信息
 const loadStats = async () => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const response = await fetch("http://localhost:3000/api/form/stats", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (response.ok) {
-      const { totalQuestions, completedQuestions } = await response.json();
-      maxNum.value = totalQuestions;
-      // 可以显示完成进度
-      console.log(`已完成: ${completedQuestions}/${totalQuestions}`);
-    }
+    const { totalQuestions, completedQuestions } = await api.form.getStats();
+    maxNum.value = totalQuestions;
+    console.log(`已完成: ${completedQuestions}/${totalQuestions}`);
   } catch (error) {
     console.error("获取统计信息失败:", error);
   }
@@ -183,29 +145,8 @@ const loadStats = async () => {
 // 加载表单数据
 const loadFormData = async () => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const response = await fetch(
-      `http://localhost:3000/api/form/query?fileName=${currentFileName.value}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (response.ok) {
-      const { data } = await response.json();
-      tableData.value = data.map((item: any) => ({
-        questionId: item.questionId,
-        question: item.question,
-        answer: item.answer,
-        vgGuide: item.vgGuide,
-        user: item.user.username,
-        updatedAt: new Date(item.updatedAt).toLocaleString(),
-      }));
-    }
+    const { data } = await api.form.queryByFileName(currentFileName.value);
+    tableData.value = data;
   } catch (error) {
     console.error("加载数据失败:", error);
   }
@@ -214,21 +155,10 @@ const loadFormData = async () => {
 // 获取最后编辑的文件
 const loadLastEdited = async () => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const response = await fetch("http://localhost:3000/api/form/last-edited", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (response.ok) {
-      const { lastEditedFile } = await response.json();
-      if (lastEditedFile) {
-        currentFileName.value = lastEditedFile;
-        await loadFormData();
-      }
+    const { lastEditedFile } = await api.form.getLastEdited();
+    if (lastEditedFile) {
+      currentFileName.value = lastEditedFile;
+      await loadFormData();
     }
   } catch (error) {
     console.error("获取最后编辑记录失败:", error);
@@ -237,22 +167,11 @@ const loadLastEdited = async () => {
 
 // 修改题号变化处理
 const onNumChange = async () => {
-  const response = await fetch(
-    `http://localhost:3000/api/form/query?questionId=${num.value}`,
-    {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    }
-  );
-
-  if (response.ok) {
-    const { data } = await response.json();
-    if (data.length > 0) {
-      currentFileName.value = data[0].imageFileName;
-      await loadFormData();
-      displayImage(currentFileName.value);
-    }
+  const { data } = await api.form.queryByQuestionId(num.value);
+  if (data.length > 0) {
+    currentFileName.value = data[0].imageFileName;
+    await loadFormData();
+    displayImage(currentFileName.value);
   }
 };
 
@@ -267,17 +186,12 @@ onMounted(async () => {
 // 表格当前行
 const currentRow = ref();
 
-const selectQuestion = (row: TableRow) => {
+const selectQuestion = (row: FormDataItem) => {
   currentRow.value = row;
   formData.value.question = row.question;
   formData.value.answer = row.answer;
   formData.value.vgGuide = row.vgGuide;
 };
-
-interface BBox {
-  type: string;
-  bbox2d: number[];
-}
 
 const formData = ref<{
   question: string;
@@ -440,85 +354,47 @@ function handleBboxClick(bbox: BBox) {
 // 保存表单数据
 const handleSave = async () => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      ElMessage.warning("请先登录");
-      return;
-    }
-
-    const response = await fetch("http://localhost:3000/api/form/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        ...formData.value,
-        imageFileName: currentFileName.value,
-      }),
+    await api.form.save({
+      ...formData.value,
+      imageFileName: currentFileName.value,
     });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      ElMessage.success("保存成功");
-      // 刷新表单数据
-      await loadFormData();
-    } else {
-      ElMessage.error(data.message || "保存失败");
-    }
+    ElMessage.success("保存成功");
+    await loadFormData();
   } catch (error) {
-    ElMessage.error("服务器错误");
+    ElMessage.error("保存失败");
   }
 };
 
 // 上传CSV文件到服务器
+const fileInput = ref<HTMLInputElement>();
+function handleUpload(e: Event) {
+  const input = e.target as HTMLInputElement;
+  if (input.files && input.files[0]) {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadCSVToServer(input.files[0]);
+    input.value = "";
+  }
+}
 const uploadCSVToServer = async (file: File, forceUpdate = false) => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      ElMessage.warning("请先登录");
-      return;
-    }
-
-    // 读取文件内容
     const fileContent = await file.text();
+    const response = await api.csv.upload({ fileContent, forceUpdate });
 
-    const response = await fetch("http://localhost:3000/api/csv/upload", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        fileContent,
-        forceUpdate,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      if (data.requireConfirmation) {
-        // 需要确认是否覆盖
-        ElMessageBox.confirm("题目数据将被覆盖，是否继续？", "警告", {
-          confirmButtonText: "确定",
-          cancelButtonText: "取消",
-          type: "warning",
+    if (response.requireConfirmation) {
+      ElMessageBox.confirm("题目数据将被覆盖，是否继续？", "警告", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      })
+        .then(() => {
+          uploadCSVToServer(file, true);
         })
-          .then(() => {
-            // 用户确认覆盖，重新上传
-            uploadCSVToServer(file, true);
-          })
-          .catch(() => {
-            ElMessage.info("已取消上传");
-            fileList.value = []; // 清空文件选择
-          });
-      } else if (data.status === "success") {
-        ElMessage.success("CSV文件上传成功");
-      }
-    } else {
-      ElMessage.error(data.message || "CSV文件上传失败");
+        .catch(() => {
+          ElMessage.info("已取消上传");
+        });
+    } else if (response.status === "success") {
+      ElMessage.success("CSV文件上传成功");
     }
   } catch (error) {
     console.error("上传CSV数据失败:", error);

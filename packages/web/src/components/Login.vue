@@ -19,7 +19,6 @@ import { ElMessage } from "element-plus";
 import { useRouter } from "vue-router";
 import { AuthService } from "@/services/authService";
 import { api } from "@/utils/http";
-import { initPublicKey } from "@/utils/authHooks";
 
 defineEmits(["switchRegister"]);
 
@@ -29,24 +28,20 @@ const loginForm = ref({
   password: "",
 });
 
-const { encrypt } = initPublicKey();
+const { encrypt } = AuthService.initPublicKey();
 
 const handleLogin = async () => {
   try {
     const encryptedPassword = encrypt(loginForm.value.password);
 
-    const data: any = await api.auth.login({
+    const data = await api.auth.login({
       username: loginForm.value.username,
       encryptedPassword,
     });
+    console.log("login", data);
 
     // 保存认证信息
-    AuthService.saveTokens({
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expires: data.expires,
-      refreshExpires: data.refreshExpires,
-    });
+    AuthService.saveTokens(data);
     AuthService.saveUser(data.user);
 
     ElMessage.success("登录成功");

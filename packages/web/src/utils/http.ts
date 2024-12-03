@@ -1,24 +1,24 @@
 import ky from "ky";
 import { AuthService } from "../services/authService";
 import router from "../router";
-
-// API 接口类型定义
-interface RegisterData {
-  username: string;
-  encryptedPassword: string;
-}
-
-interface RegisterResponse {
-  user: {
-    id: string;
-    username: string;
-    roles: string[];
-  };
-  accessToken: string;
-  refreshToken: string;
-  expires: string;
-  refreshExpires: string;
-}
+import type {
+  UserInfo,
+  LoginResponse,
+  RegisterData,
+  RegisterResponse,
+  UpdateRolesData,
+  BatchUpdateRolesData,
+  ChangePasswordData,
+  FormStats,
+  FormQueryResponse,
+  LastEditedResponse,
+  SaveFormData,
+  SaveFormResponse,
+  CSVUploadData,
+  CSVUploadResponse,
+  CSVCheckResponse,
+  CSVDataResponse,
+} from "@/types";
 
 const prefixUrl = "http://localhost:3000/api";
 
@@ -32,7 +32,7 @@ const http = ky.create({
         // 检查并刷新token
         const isValid = await AuthService.refreshTokenIfNeeded();
         if (!isValid) {
-          AuthService.clear();
+          AuthService.logout();
           router.push("/login");
           throw new Error("认证已过期");
         }
@@ -61,7 +61,7 @@ const http = ky.create({
             }
           }
           // 其他认证错误，清除状态并跳转登录
-          AuthService.clear();
+          AuthService.logout();
           router.push("/login");
         }
         return response;
@@ -75,16 +75,21 @@ const publicRequest = ky.create({
   timeout: 30000,
 });
 
-// 请求方法封装
+// API 接口定义
 export const api = {
   // 认证相关
   auth: {
-    getPublicKey: () => publicRequest.get("users/public-key").json(),
-    login: (data: any) =>
-      publicRequest.post("users/login", { json: data }).json(),
-    refreshToken: (data: any) =>
-      http.post("users/refresh-token", { json: data }).json(),
-    logout: () => http.post("users/logout").json(),
+    getPublicKey: () =>
+      publicRequest.get("users/public-key").json<{ publicKey: string }>(),
+
+    login: (data: { username: string; encryptedPassword: string }) =>
+      publicRequest.post("users/login", { json: data }).json<LoginResponse>(),
+
+    refreshToken: (data: { refreshToken: string }) =>
+      http.post("users/refresh-token", { json: data }).json<LoginResponse>(),
+
+    logout: () => http.post("users/logout").json<{ message: string }>(),
+
     register: (data: RegisterData) =>
       publicRequest
         .post("users/register", { json: data })
@@ -93,19 +98,49 @@ export const api = {
 
   // 用户相关
   users: {
-    getAll: () => http.get("users/all").json(),
-    getInfo: () => http.get("users/info").json(),
-    updateRoles: (data: any) =>
-      http.put("users/update-roles", { json: data }).json(),
-    batchUpdateRoles: (data: any) =>
-      http.put("users/batch-update-roles", { json: data }).json(),
-    changePassword: (data: any) =>
-      http.put("users/change-password", { json: data }).json(),
+    getAll: () => http.get("users/all").json<UserInfo[]>(),
+
+    getInfo: () => http.get("users/info").json<UserInfo>(),
+
+    updateRoles: (data: UpdateRolesData) =>
+      http.put("users/update-roles", { json: data }).json<UserInfo>(),
+
+    batchUpdateRoles: (data: BatchUpdateRolesData) =>
+      http
+        .put("users/batch-update-roles", { json: data })
+        .json<{ message: string }>(),
+
+    changePassword: (data: ChangePasswordData) =>
+      http
+        .put("users/change-password", { json: data })
+        .json<{ message: string }>(),
   },
 
-  // 角色相关
-  roles: {
-    getByRole: (role: string) => http.get(`users/by-role/${role}`).json(),
+  // 表单相关
+  form: {
+    getStats: () => http.get("form/stats").json<FormStats>(),
+
+    queryByFileName: (fileName: string) =>
+      http.get(`form/query?fileName=${fileName}`).json<FormQueryResponse>(),
+
+    queryByQuestionId: (questionId: number) =>
+      http.get(`form/query?questionId=${questionId}`).json<FormQueryResponse>(),
+
+    getLastEdited: () =>
+      http.get("form/last-edited").json<LastEditedResponse>(),
+
+    save: (data: SaveFormData) =>
+      http.post("form/save", { json: data }).json<SaveFormResponse>(),
+  },
+
+  // CSV相关
+  csv: {
+    check: () => http.get("csv/check").json<CSVCheckResponse>(),
+
+    upload: (data: CSVUploadData) =>
+      http.post("csv/upload", { json: data }).json<CSVUploadResponse>(),
+
+    getData: () => http.get("csv/data").json<CSVDataResponse>(),
   },
 };
 

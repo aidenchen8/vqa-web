@@ -41,7 +41,6 @@
 import { ref } from "vue";
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import { initPublicKey } from "@/utils/authHooks";
 import { api } from "@/utils/http";
 import { AuthService } from "@/services/authService";
 
@@ -92,7 +91,7 @@ const rules = ref<FormRules>({
   ],
 });
 
-const { encrypt } = initPublicKey();
+const { encrypt } = AuthService.initPublicKey();
 
 const handleRegister = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
@@ -113,12 +112,7 @@ const handleRegister = async (formEl: FormInstance | undefined) => {
         });
 
         // 可以选择是否自动登录
-        AuthService.saveTokens({
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-          expires: response.expires,
-          refreshExpires: response.refreshExpires,
-        });
+        AuthService.saveTokens(response);
         AuthService.saveUser(response.user);
 
         ElMessage.success("注册成功");
