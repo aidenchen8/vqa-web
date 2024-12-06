@@ -10,13 +10,12 @@ const routes = [
     path: "/",
     component: () => import("@/views/Home.vue"),
     redirect: "/vqa",
-    children: [
-      {
-        path: "/vqa",
-        component: () => import("@/views/VQA.vue"),
-        meta: { auth: "user" },
-      },
-    ],
+    children: [],
+  },
+  {
+    path: "/vqa",
+    component: () => import("@/views/VQA.vue"),
+    meta: { auth: "user" },
   },
   { path: "/login", component: () => import("@/views/Login.vue") },
   {
@@ -34,13 +33,10 @@ const router = createRouter({
 });
 
 // 路由守卫
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, from, next) => {
   // 检查是否需要登录
-  if (to.matched.some((record) => record.meta.auth)) {
-    // 检查登录状态和token有效性
-    const isAuthenticated = await AuthService.refreshTokenIfNeeded();
-
-    if (!isAuthenticated) {
+  if (to.path !== "/login" && to.matched.some((record) => record.meta.auth)) {
+    if (AuthService.isTokenExpired()) {
       next({
         path: "/login",
         query: { redirect: to.fullPath }, // 保存原目标路径

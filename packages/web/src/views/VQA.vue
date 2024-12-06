@@ -1,6 +1,6 @@
 <template>
   <!-- @vue-expect-error -->
-  <el-page-header title="VQA标注系统" :icon="null" style="padding: 16px">
+  <el-page-header class="vqa-header" title="VQA标注系统" :icon="null">
     <template #extra>
       <div class="flex items-center">
         <span>&emsp;</span>
@@ -12,6 +12,7 @@
               .slice(-16)
           }}&emsp;</span
         >
+        <!-- TODO: 干掉数字 -->
         <el-input-number
           v-model="num"
           :min="0"
@@ -113,12 +114,12 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { ElMessageBox, ElMessage } from "element-plus";
 import { getFilePath } from "@/utils/config";
 import { AuthService } from "@/services/authService";
 import { useStore } from "@/store";
-import type { FormDataItem, BBox } from "@/types";
+import type { FormDataItem, BBox, CSVDataResponse } from "@/types";
 import { api } from "@/utils/http";
 
 const store = useStore();
@@ -127,7 +128,7 @@ const maxNum = ref(0);
 const tableData = ref<FormDataItem[]>([]);
 
 // 当前题目序号
-const num = ref(2866);
+const num = ref(0);
 // 当前图片文件名
 const currentFileName = ref<string>("");
 
@@ -142,11 +143,26 @@ const loadStats = async () => {
   }
 };
 
+// 获取列表信息
+const fileInfo = ref<CSVDataResponse>();
+const currentFileInfo = computed(() => fileInfo.value?.[0]);
+
+async function getList() {
+  try {
+    fileInfo.value = await api.csv.getData();
+  } catch (error) {
+    console.error("获取列表信息失败:", error);
+    ElMessage.error("获取列表信息失败");
+  }
+}
+
 // 加载表单数据
 const loadFormData = async () => {
   try {
-    const { data } = await api.form.queryByFileName(currentFileName.value);
-    tableData.value = data;
+    // const { data } = await api.form.queryByFileName(currentFileName.value);
+    tableData.value =
+      currentFileInfo.value?.questionsMap[currentFileName.value]!;
+    displayImage(currentFileName.value);
   } catch (error) {
     console.error("加载数据失败:", error);
   }
@@ -158,10 +174,13 @@ const loadLastEdited = async () => {
     const { lastEditedFile } = await api.form.getLastEdited();
     if (lastEditedFile) {
       currentFileName.value = lastEditedFile;
-      await loadFormData();
     }
   } catch (error) {
-    console.error("获取最后编辑记录失败:", error);
+    currentFileName.value = currentFileInfo.value?.fileIndexMap[0]!;
+    console.error("获取最后编辑记录失败, 指向第一个文件:", error);
+    ElMessage.error("获取最后编辑记录失败, 指向第一个文件");
+  } finally {
+    await loadFormData();
   }
 };
 
@@ -171,16 +190,15 @@ const onNumChange = async () => {
   if (data.length > 0) {
     currentFileName.value = data[0].imageFileName;
     await loadFormData();
-    displayImage(currentFileName.value);
   }
 };
 
 // 组件挂载时初始化
 onMounted(async () => {
-  if (localStorage.getItem("token")) {
-    await loadStats();
-    await loadLastEdited();
-  }
+  await loadStats();
+  await getList();
+  await loadLastEdited();
+  window.addEventListener("resize", drawBboxes);
 });
 
 // 表格当前行
@@ -248,8 +266,8 @@ function loadBboxes(name: string) {
     .then((response) => response.text())
     .then((data) => {
       const lines = data.split("\n");
+      bboxes.value = [];
       lines.forEach((line) => {
-        bboxes.value = [];
         const parts = line.trim().split(" ");
         if (parts.length >= 14) {
           const bboxData = {
@@ -272,6 +290,8 @@ function drawBboxes() {
     console.error("can not find bboxesContainer or imageElement");
     return;
   }
+  bboxesContainer.innerHTML = "";
+  bboxesContainer.appendChild(imageElement.value);
   // 获取缩放后的实际位置和大小
   const imgRect = imageElement.value.getBoundingClientRect();
   scale = imgRect.width / imageElement.value.naturalWidth;
@@ -379,7 +399,11 @@ function handleUpload(e: Event) {
 const uploadCSVToServer = async (file: File, forceUpdate = false) => {
   try {
     const fileContent = await file.text();
-    const response = await api.csv.upload({ fileContent, forceUpdate });
+    const response = await api.csv.upload({
+      fileContent,
+      forceUpdate,
+      type: "a1",
+    });
 
     if (response.requireConfirmation) {
       ElMessageBox.confirm("题目数据将被覆盖，是否继续？", "警告", {
@@ -409,8 +433,21 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .app-container {
-  padding: 0 16px;
+  padding: 66px 16px 0 16px;
 }
+
+.vqa-header {
+  padding: 16px;
+  width: 100vw;
+  box-sizing: border-box;
+  background-color: #fff;
+  position: fixed;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  top: 0;
+  left: 0;
+  z-index: 999;
+}
+
 :deep(.el-page-header__title) {
   font-size: 20px;
   font-weight: bold;
@@ -427,25 +464,6 @@ onBeforeUnmount(() => {
 #image {
   width: 100%;
   position: relative;
-}
-
-.bbox {
-  position: absolute;
-  border: 2px solid red;
-  /* pointer-events: none; */ /* 移除这个属性 */
-}
-.bbox-label {
-  position: absolute;
-  color: white; /* 文本颜色 */
-  background-color: rgba(0, 0, 0, 0.7); /* 背景颜色 */
-  padding: 2px 4px; /* 内边距 */
-  border-radius: 3px; /* 圆角 */
-  font-size: 12px; /* 字体大小 */
-  transform: translateY(-100%); /* 上移文本 */
-}
-.bbox.selected {
-  border-color: rgb(0, 30, 255); /* 选中时的边框颜色 */
-  /*pointer-events: auto;  允许点击事件 */
 }
 
 .table-container {
@@ -466,5 +484,26 @@ onBeforeUnmount(() => {
     margin-left: 0;
     width: 100%;
   }
+}
+</style>
+
+<style>
+.bbox {
+  position: absolute;
+  border: 2px solid red;
+  /* pointer-events: none; */ /* 移除这个属性 */
+}
+.bbox-label {
+  position: absolute;
+  color: white; /* 文本颜色 */
+  background-color: rgba(0, 0, 0, 0.7); /* 背景颜色 */
+  padding: 2px 4px; /* 内边距 */
+  border-radius: 3px; /* 圆角 */
+  font-size: 12px; /* 字体大小 */
+  transform: translateY(-100%); /* 上移文本 */
+}
+.bbox.selected {
+  border-color: rgb(0, 30, 255); /* 选中时的边框颜色 */
+  /*pointer-events: auto;  允许点击事件 */
 }
 </style>

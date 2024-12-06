@@ -95,6 +95,7 @@ export type SaveFormResponse = FormDataItem;
 export interface CSVUploadData {
   fileContent: string;
   forceUpdate: boolean;
+  type: string;
 }
 
 export interface CSVUploadResponse {
@@ -107,7 +108,10 @@ export interface CSVCheckResponse {
   hasData: boolean;
 }
 
-export interface CSVDataResponse {
+export interface CSVDataMapItem {
   questionsMap: Record<string, FormDataItem[]>;
   fileIndexMap: string[];
+  type: string;
 }
+
+export type CSVDataResponse = CSVDataMapItem[];

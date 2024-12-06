@@ -1,4 +1,5 @@
 import CSVData from "../models/CSVData.js";
+import { TokenService } from "../services/tokenService.js";
 import Papa from "papaparse";
 
 // 解析CSV文件
@@ -61,9 +62,23 @@ export const uploadCSV = async (req, res) => {
   try {
     const fileContent = req.body.fileContent;
     const forceUpdate = req.body.forceUpdate; // 是否强制更新
+    const authType = req.body.type; // 获取用户类型
+
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "未提供认证令牌" });
+    }
+
+    const user = await TokenService.getUserFromToken(token);
+
+    if (!user) {
+      return res.status(401).json({ message: "未找到用户信息" });
+    }
 
     // 检查是否存在数据
-    const existingData = await CSVData.findOne({ user: req.user._id });
+    const existingData = await CSVData.findOne({ user: user._id });
     if (existingData && !forceUpdate) {
       return res.status(409).json({
         message: "已存在题目数据",
@@ -85,11 +100,11 @@ export const uploadCSV = async (req, res) => {
     if (existingData) {
       // 清空并更新数据
       existingData.files = files;
-      await existingData.save();
     } else {
-      // 创建新数据
+      // 创建新数据，添加权限类型
       await CSVData.create({
-        user: req.user._id,
+        user: user._id,
+        type: authType,
         files,
       });
     }
@@ -106,24 +121,39 @@ export const uploadCSV = async (req, res) => {
 // 获取用户的CSV数据
 export const getCSVData = async (req, res) => {
   try {
-    const csvData = await CSVData.findOne({ user: req.user._id });
-    if (!csvData) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1];
+    const user = await TokenService.getUserFromToken(token);
+
+    if (!user || !user.roles) {
+      return res.status(401).json({ message: "未找到用户信息或角色" });
+    }
+
+    // 根据用户的 roles 查询 CSV 数据
+    const csvDataList = await CSVData.find({ type: { $in: user.roles } });
+
+    if (csvDataList.length === 0) {
       return res.status(404).json({ message: "未找到CSV数据" });
     }
 
     // 转换数据格式为前端所需的格式
-    const questionsMap = {};
-    const fileIndexMap = [];
+    const result = csvDataList.map((csvData) => {
+      const questionsMap = {};
+      const fileIndexMap = [];
 
-    csvData.files.forEach((file) => {
-      questionsMap[file.fileName] = file.questions;
-      fileIndexMap.push(file.fileName);
+      csvData.files.forEach((file) => {
+        questionsMap[file.fileName] = file.questions;
+        fileIndexMap.push(file.fileName);
+      });
+
+      return {
+        questionsMap,
+        fileIndexMap,
+        type: csvData.type, // 返回对应的类型
+      };
     });
 
-    res.json({
-      questionsMap,
-      fileIndexMap,
-    });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: "获取数据失败", error: error.message });
   }

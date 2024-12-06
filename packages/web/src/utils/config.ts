@@ -1,7 +1,7 @@
 import { ElMessage } from "element-plus";
 
-export const BASE_URL = import.meta.env.BASE_URL;
-export const API_PREFIX = import.meta.env.API;
+export const BASE_URL = import.meta.env.VITE_PREFIX;
+export const API_PREFIX = import.meta.env.VITE_API;
 
 export const userImageMap: Record<string, string> = {
   a1: "/training-image_2a",
@@ -15,7 +15,7 @@ export const userImageMap: Record<string, string> = {
 
 export const IMG_FOLDER_PATH = BASE_URL + "/Rope3D"; // 全局变量，用于存储文件夹地址
 
-export const BOX_PATH = BASE_URL + "/Rope3D/training/label_2"; // 全局变量，用于存储边界框地址
+export const BOX_PATH = BASE_URL + "/Rope3D/training/label_2/"; // 全局变量，用于存储边界框地址
 
 /**
  * 获取文件路径
@@ -31,9 +31,9 @@ export function getFilePath(roles: string[], type: "img" | "box") {
     return "";
   }
   if (type === "img") {
-    return IMG_FOLDER_PATH + userImageMap[role];
+    return IMG_FOLDER_PATH + userImageMap[role] + "/";
   } else if (type === "box") {
-    if (role === "val") return BASE_URL + "/Rope3D/validation/label_2";
+    if (role === "val") return BASE_URL + "/Rope3D/validation/label_2/";
     return BOX_PATH;
   }
 }
