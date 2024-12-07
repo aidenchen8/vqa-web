@@ -1,4 +1,3 @@
-import { ElMessage } from "element-plus";
 import { createWebHistory, createRouter } from "vue-router";
 import { AuthService } from "../services/authService";
 import { useStore } from "@/store";
@@ -34,8 +33,12 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
+  // 防止死循环
+  if (to.path.includes("/login")) {
+    next();
+  }
   // 检查是否需要登录
-  if (to.path !== "/login" && to.matched.some((record) => record.meta.auth)) {
+  if (to.matched.some((record) => record.meta.auth)) {
     if (AuthService.isTokenExpired()) {
       next({
         path: "/login",

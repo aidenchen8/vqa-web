@@ -120,8 +120,10 @@ export const api = {
   form: {
     getStats: () => http.get("form/stats").json<FormStats>(),
 
-    queryByFileName: (fileName: string) =>
-      http.get(`form/query?fileName=${fileName}`).json<FormQueryResponse>(),
+    queryByFileName: (imageFileName: string) =>
+      http
+        .get(`form/query?imageFileName=${imageFileName}`)
+        .json<FormQueryResponse>(),
 
     queryByQuestionId: (questionId: number) =>
       http.get(`form/query?questionId=${questionId}`).json<FormQueryResponse>(),

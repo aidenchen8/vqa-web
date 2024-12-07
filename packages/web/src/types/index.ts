@@ -9,6 +9,7 @@ export interface TableRow {
 export interface BBox {
   type: string;
   bbox2d: number[];
+  _id?: string;
 }
 
 export interface UserInfo {
@@ -71,13 +72,6 @@ export interface FormDataItem {
   imageFileName: string;
 }
 
-export interface FormQueryResponse {
-  total: number;
-  data: FormDataItem[];
-  page: number;
-  pageSize: number;
-}
-
 export interface LastEditedResponse {
   lastEditedFile: string;
 }
@@ -92,6 +86,7 @@ export interface SaveFormData {
 
 export type SaveFormResponse = FormDataItem;
 
+export type FormQueryResponse = SaveFormData[];
 export interface CSVUploadData {
   fileContent: string;
   forceUpdate: boolean;

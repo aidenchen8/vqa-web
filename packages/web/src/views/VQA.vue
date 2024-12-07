@@ -4,32 +4,21 @@
     <template #extra>
       <div class="flex items-center">
         <span>&emsp;</span>
-        <span
-          >{{
-            currentFileName
-              ?.replace(".jpg", "")
-              .replace("_obstacle", "")
-              .slice(-16)
-          }}&emsp;</span
-        >
-        <!-- TODO: 干掉数字 -->
-        <el-input-number
-          v-model="num"
-          :min="0"
-          :max="maxNum"
-          style="width: 200px"
-          @change="onNumChange"
-        >
-          <template #prefix>
-            <span>第</span>
-          </template>
-          <template #suffix>
-            <span>题</span>
-          </template>
-        </el-input-number>
-
+        <el-statistic :value="finishedNum">
+          <template #suffix>/{{ currentFileNameOptions.length }}</template>
+        </el-statistic>
+        <el-select-v2
+          v-model="currentFileName"
+          filterable
+          :options="currentFileNameOptions"
+          placeholder="Please select"
+          style="width: 240px"
+          @change="loadFormData"
+        />
+        <el-button @click="changeQuestion('pre')">上一题</el-button>
+        <el-button @click="changeQuestion('next')">下一题</el-button>
         <el-button type="primary" @click="handleSave">保存</el-button>
-        <el-dropdown placement="bottom-end" style="margin-left: 16px">
+        <el-dropdown placement="bottom-end">
           <el-button> {{ store.userInfo?.username }} </el-button>
           <template #dropdown>
             <el-dropdown-menu>
@@ -58,7 +47,7 @@
       <el-card class="table-container">
         <el-table :data="tableData" style="width: 100%">
           <el-table-column type="index" width="50" />
-          <el-table-column property="question" label="问题" min-width="280">
+          <el-table-column property="question" label="问题" min-width="360">
             <template #default="scope">
               <el-link
                 :type="
@@ -78,7 +67,7 @@
             label="翻译"
             min-width="200"
           />
-          <el-table-column property="answer" label="回答" min-width="200" />
+          <el-table-column property="answer" label="回答" min-width="300" />
           <el-table-column
             property="vgGuide"
             label="VG指导"
@@ -94,6 +83,7 @@
         </el-table>
       </el-card>
       <el-card class="form-container">
+        <br />
         <el-form ref="formRef" :model="formData" label-width="30px">
           <el-form-item label="Q:" prop="question">
             <el-input v-model="formData.question" type="textarea"></el-input>
@@ -115,7 +105,7 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
-import { ElMessageBox, ElMessage } from "element-plus";
+import { ElMessageBox, ElMessage, type ElForm } from "element-plus";
 import { getFilePath } from "@/utils/config";
 import { AuthService } from "@/services/authService";
 import { useStore } from "@/store";
@@ -124,20 +114,18 @@ import { api } from "@/utils/http";
 
 const store = useStore();
 
-const maxNum = ref(0);
+const finishedNum = ref(0);
 const tableData = ref<FormDataItem[]>([]);
+const formRef = ref<typeof ElForm>();
 
-// 当前题目序号
-const num = ref(0);
 // 当前图片文件名
 const currentFileName = ref<string>("");
 
 // 获取统计信息
 const loadStats = async () => {
   try {
-    const { totalQuestions, completedQuestions } = await api.form.getStats();
-    maxNum.value = totalQuestions;
-    console.log(`已完成: ${completedQuestions}/${totalQuestions}`);
+    const { completedQuestions } = await api.form.getStats();
+    finishedNum.value = completedQuestions;
   } catch (error) {
     console.error("获取统计信息失败:", error);
   }
@@ -146,6 +134,15 @@ const loadStats = async () => {
 // 获取列表信息
 const fileInfo = ref<CSVDataResponse>();
 const currentFileInfo = computed(() => fileInfo.value?.[0]);
+const currentFileNameOptions = computed(() => {
+  if (currentFileInfo.value?.fileIndexMap) {
+    return currentFileInfo.value?.fileIndexMap.map((item) => ({
+      value: item,
+      label: item,
+    }));
+  }
+  return [];
+});
 
 async function getList() {
   try {
@@ -159,12 +156,23 @@ async function getList() {
 // 加载表单数据
 const loadFormData = async () => {
   try {
-    // const { data } = await api.form.queryByFileName(currentFileName.value);
+    formRef.value?.resetFields();
+    const res = await api.form.queryByFileName(currentFileName.value);
+    if (res?.[0]) {
+      const data = res[0];
+      formData.value.answer = data.answer;
+      formData.value.question = data.question;
+      formData.value.vgGuide = data.vgGuide;
+      formData.value.selectedBboxes = data.selectedBboxes.map(
+        ({ _id, ...rest }) => rest
+      );
+    }
+  } catch (error) {
+    console.error("加载历史数据失败", error);
+  } finally {
     tableData.value =
       currentFileInfo.value?.questionsMap[currentFileName.value]!;
     displayImage(currentFileName.value);
-  } catch (error) {
-    console.error("加载数据失败:", error);
   }
 };
 
@@ -174,21 +182,14 @@ const loadLastEdited = async () => {
     const { lastEditedFile } = await api.form.getLastEdited();
     if (lastEditedFile) {
       currentFileName.value = lastEditedFile;
+    } else {
+      throw new Error("未找到最后编辑记录");
     }
   } catch (error) {
     currentFileName.value = currentFileInfo.value?.fileIndexMap[0]!;
     console.error("获取最后编辑记录失败, 指向第一个文件:", error);
     ElMessage.error("获取最后编辑记录失败, 指向第一个文件");
   } finally {
-    await loadFormData();
-  }
-};
-
-// 修改题号变化处理
-const onNumChange = async () => {
-  const { data } = await api.form.queryByQuestionId(num.value);
-  if (data.length > 0) {
-    currentFileName.value = data[0].imageFileName;
     await loadFormData();
   }
 };
@@ -200,6 +201,29 @@ onMounted(async () => {
   await loadLastEdited();
   window.addEventListener("resize", drawBboxes);
 });
+
+const changeQuestion = (direction: "pre" | "next") => {
+  const currentIndex = currentFileNameOptions.value.findIndex(
+    (option) => option.value === currentFileName.value
+  );
+
+  if (direction === "pre") {
+    if (currentIndex <= 0) {
+      ElMessage.warning("已经是第一题了！！！");
+      return;
+    }
+    currentFileName.value =
+      currentFileNameOptions.value[currentIndex - 1].value;
+  } else if (direction === "next") {
+    if (currentIndex >= currentFileNameOptions.value.length - 1) {
+      ElMessage.warning("已经是最后一题了！！！");
+      return;
+    }
+    currentFileName.value =
+      currentFileNameOptions.value[currentIndex + 1].value;
+  }
+  loadFormData(); // 重新加载表单数据
+};
 
 // 表格当前行
 const currentRow = ref();
@@ -451,6 +475,10 @@ onBeforeUnmount(() => {
 :deep(.el-page-header__title) {
   font-size: 20px;
   font-weight: bold;
+}
+
+.el-button {
+  margin-left: 16px;
 }
 
 .el-link {

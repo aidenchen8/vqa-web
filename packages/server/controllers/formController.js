@@ -1,26 +1,31 @@
 /* eslint-disable radix */
 import FormData from "../models/FormData.js";
 import User from "../models/User.js";
+import { TokenService } from "../services/tokenService.js";
 
 export const saveFormData = async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1];
+    const user = await TokenService.getUserFromToken(token);
+
     const { question, answer, vgGuide, selectedBboxes, imageFileName } =
       req.body;
 
-    await User.findByIdAndUpdate(req.user._id, {
+    await User.findByIdAndUpdate(user._id, {
       lastEditedFile: imageFileName,
     });
 
     let formData = await FormData.findOne({
       imageFileName,
-      question,
     });
 
     if (formData) {
+      formData.question = question;
       formData.answer = answer;
       formData.vgGuide = vgGuide;
       formData.selectedBboxes = selectedBboxes;
-      formData.user = req.user._id;
+      formData.user = user._id;
 
       await formData.save();
     } else {
@@ -30,11 +35,18 @@ export const saveFormData = async (req, res) => {
         answer,
         vgGuide,
         selectedBboxes,
-        user: req.user._id,
+        user: user._id,
       });
     }
 
-    res.json(formData);
+    const completedQuestions = await FormData.countDocuments({
+      answer: { $exists: true, $ne: "" },
+    });
+
+    res.json({
+      formData,
+      completedQuestions,
+    });
   } catch (error) {
     res.status(500).json({ message: "保存失败", error: error.message });
   }
@@ -42,6 +54,10 @@ export const saveFormData = async (req, res) => {
 
 export const getFormData = async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1];
+    const user = await TokenService.getUserFromToken(token);
+
     const { imageFileName } = req.query;
 
     const formData = await FormData.find({ imageFileName })
@@ -102,7 +118,10 @@ export const queryFormData = async (req, res) => {
 
 export const getLastEdited = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(" ")[1];
+    const user = await TokenService.getUserFromToken(token);
+
     res.json({ lastEditedFile: user.lastEditedFile });
   } catch (error) {
     res.status(500).json({ message: "获取失败", error: error.message });
