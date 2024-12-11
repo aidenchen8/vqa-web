@@ -1,16 +1,11 @@
+import type { UserInfo } from "@/types";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
-export interface User {
-  id: string;
-  username: string;
-  roles: string[];
-}
-
 export const useStore = defineStore("counter", () => {
-  const userInfo = ref<User | undefined>();
-  function setUser(user: User) {
+  const userInfo = ref<UserInfo | undefined>();
+  function setUser(user: UserInfo) {
     userInfo.value = user;
   }
 

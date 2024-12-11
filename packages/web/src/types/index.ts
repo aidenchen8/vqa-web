@@ -13,7 +13,7 @@ export interface BBox {
 }
 
 export interface UserInfo {
-  id: string;
+  _id: string;
   username: string;
   roles: string[];
 }

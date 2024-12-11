@@ -3,16 +3,17 @@
   <el-page-header class="vqa-header" title="VQA标注系统" :icon="null">
     <template #extra>
       <div class="flex items-center">
-        <span>&emsp;</span>
-        <el-statistic :value="finishedNum">
-          <template #suffix>/{{ currentFileNameOptions.length }}</template>
-        </el-statistic>
+        <div class="vqa-statistic">
+          <div>当前：{{ currentIndex + 1 }}</div>
+          <div>完成：{{ finishedNum }}</div>
+          <div>总数：{{ currentFileNameOptions.length }}</div>
+        </div>
         <el-select-v2
           v-model="currentFileName"
           filterable
           :options="currentFileNameOptions"
           placeholder="Please select"
-          style="width: 240px"
+          style="width: 380px"
           @change="loadFormData"
         />
         <el-button @click="changeQuestion('pre')">上一题</el-button>
@@ -83,21 +84,30 @@
         </el-table>
       </el-card>
       <el-card class="form-container">
-        <br />
         <el-form ref="formRef" :model="formData" label-width="30px">
+          <el-form-item label="VG:" prop="vgGuide">
+            <el-input
+              v-model="formData.vgGuide"
+              type="textarea"
+              disabled
+            ></el-input>
+          </el-form-item>
+          <br />
+          <br />
           <el-form-item label="Q:" prop="question">
-            <el-input v-model="formData.question" type="textarea"></el-input>
+            <el-input
+              v-model="formData.question"
+              type="textarea"
+              :rows="3"
+            ></el-input>
           </el-form-item>
           <el-form-item label="A:" prop="answer">
             <el-input v-model="formData.answer" type="textarea"></el-input>
           </el-form-item>
-          <el-form-item label="VG:" prop="vgGuide">
-            <el-input v-model="formData.vgGuide" type="textarea"></el-input>
-          </el-form-item>
         </el-form>
       </el-card>
     </div>
-    <el-card style="margin-top: 16px">
+    <el-card style="margin-top: 8px">
       <div id="image"></div>
     </el-card>
   </div>
@@ -138,7 +148,7 @@ const currentFileNameOptions = computed(() => {
   if (currentFileInfo.value?.fileIndexMap) {
     return currentFileInfo.value?.fileIndexMap.map((item) => ({
       value: item,
-      label: item,
+      label: item.slice(16, item.length - 13),
     }));
   }
   return [];
@@ -202,25 +212,26 @@ onMounted(async () => {
   window.addEventListener("resize", drawBboxes);
 });
 
-const changeQuestion = (direction: "pre" | "next") => {
-  const currentIndex = currentFileNameOptions.value.findIndex(
+const currentIndex = computed(() => {
+  return currentFileNameOptions.value.findIndex(
     (option) => option.value === currentFileName.value
   );
-
+});
+const changeQuestion = (direction: "pre" | "next") => {
   if (direction === "pre") {
-    if (currentIndex <= 0) {
+    if (currentIndex.value <= 0) {
       ElMessage.warning("已经是第一题了！！！");
       return;
     }
     currentFileName.value =
-      currentFileNameOptions.value[currentIndex - 1].value;
+      currentFileNameOptions.value[currentIndex.value - 1].value;
   } else if (direction === "next") {
-    if (currentIndex >= currentFileNameOptions.value.length - 1) {
+    if (currentIndex.value >= currentFileNameOptions.value.length - 1) {
       ElMessage.warning("已经是最后一题了！！！");
       return;
     }
     currentFileName.value =
-      currentFileNameOptions.value[currentIndex + 1].value;
+      currentFileNameOptions.value[currentIndex.value + 1].value;
   }
   loadFormData(); // 重新加载表单数据
 };
@@ -472,6 +483,14 @@ onBeforeUnmount(() => {
   z-index: 999;
 }
 
+.vqa-statistic {
+  font-size: 12px;
+  line-height: 14px;
+  color: #888;
+  text-align: left;
+  margin-right: 16px;
+}
+
 :deep(.el-page-header__title) {
   font-size: 20px;
   font-weight: bold;
@@ -499,7 +518,7 @@ onBeforeUnmount(() => {
 }
 
 .form-container {
-  margin-left: 16px;
+  margin-left: 8px;
   width: 400px;
   flex-shrink: 0;
 }
@@ -516,6 +535,9 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
+.el-card__body {
+  padding: 12px 16px;
+}
 .bbox {
   position: absolute;
   border: 2px solid red;

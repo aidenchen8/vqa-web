@@ -245,7 +245,7 @@ export const updateUserRoles = async (req, res) => {
     const { userId, roles } = req.body;
 
     // 验证角色是否有效
-    const validRoles = ["admin", "user", "annotator", "reviewer"];
+    const validRoles = ["admin", "user", "a1", "a2", "b1", "b2", "c1", "c2"];
     const invalidRoles = roles.filter((role) => !validRoles.includes(role));
     if (invalidRoles.length > 0) {
       return res.status(400).json({ message: "包含无效的角色" });

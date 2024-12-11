@@ -1,6 +1,7 @@
 import JSEncrypt from "jsencrypt";
 import { useStore } from "@/store";
 import { api } from "@/utils/http";
+import type { UserInfo } from "@/types";
 
 interface Tokens {
   accessToken: string;
@@ -9,16 +10,10 @@ interface Tokens {
   refreshExpires: string;
 }
 
-interface User {
-  id: string;
-  username: string;
-  roles: string[];
-}
+const TOKEN_KEY = "tokens";
+const USER_KEY = "user";
 
 export class AuthService {
-  private static readonly TOKEN_KEY = "tokens";
-  private static readonly USER_KEY = "user";
-
   public static initPublicKey() {
     const encryptor = new JSEncrypt();
 
@@ -46,20 +41,20 @@ export class AuthService {
   }
 
   public static saveTokens(tokens: Tokens) {
-    localStorage.setItem(this.TOKEN_KEY, JSON.stringify(tokens));
+    localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
   }
 
-  public static saveUser(user: User) {
+  public static saveUser(user: UserInfo) {
     const store = useStore();
     store.userInfo = user;
   }
 
   public static getTokens(): Tokens | null {
-    const tokens = localStorage.getItem(this.TOKEN_KEY);
+    const tokens = localStorage.getItem(TOKEN_KEY);
     return tokens ? JSON.parse(tokens) : null;
   }
 
-  public static async getUser(): Promise<User | undefined> {
+  public static async getUser(): Promise<UserInfo | undefined> {
     const response = await api.users.getInfo();
     this.saveUser(response);
     return response;
@@ -71,7 +66,8 @@ export class AuthService {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      localStorage.removeItem(this.TOKEN_KEY);
+      debugger;
+      localStorage.removeItem(TOKEN_KEY);
       window.location.replace(redirectUrl || window.location.origin);
     }
   }

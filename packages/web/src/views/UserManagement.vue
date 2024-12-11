@@ -49,17 +49,21 @@
 import { ref, onMounted } from "vue";
 import { ElMessage } from "element-plus";
 import { api } from "../utils/http";
-import type { User } from "@/store";
+import type { UserInfo } from "@/types";
 
-const userList = ref<User[]>([]);
+const userList = ref<UserInfo[]>([]);
 const drawerVisible = ref(false);
-const currentUser = ref<User | null>(null);
+const currentUser = ref<UserInfo | null>(null);
 
 const validRoles = [
   { label: "管理员", value: "admin" },
-  { label: "标注员", value: "annotator" },
-  { label: "审核员", value: "reviewer" },
   { label: "普通用户", value: "user" },
+  { label: "a1", value: "a1" },
+  { label: "a2", value: "a2" },
+  { label: "b1", value: "b1" },
+  { label: "b2", value: "b2" },
+  { label: "c1", value: "c1" },
+  { label: "c2", value: "c2" },
 ];
 
 // 加载用户列表
@@ -72,7 +76,7 @@ const loadUsers = async () => {
 };
 
 // 编辑用户
-const handleEdit = (user: User) => {
+const handleEdit = (user: UserInfo) => {
   currentUser.value = JSON.parse(JSON.stringify(user));
   drawerVisible.value = true;
 };
@@ -83,7 +87,7 @@ const handleSave = async () => {
 
   try {
     await api.users.updateRoles({
-      userId: currentUser.value.id,
+      userId: currentUser.value._id,
       roles: currentUser.value.roles,
     });
 

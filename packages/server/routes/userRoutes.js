@@ -5,6 +5,7 @@ import {
   registerUser,
   getPublicKey,
   getUserInfo,
+  getAllUsers,
   updateUser,
   updateUserRoles,
   changePassword,
@@ -19,6 +20,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/logout", authenticateToken, logout);
 router.get("/info", authenticateToken, getUserInfo);
+router.get("/all", protect, hasRole("admin"), getAllUsers);
 router.put("/update", protect, updateUser);
 router.put("/update-roles", protect, hasRole("admin"), updateUserRoles);
 router.put("/change-password", protect, changePassword);
