@@ -14,7 +14,7 @@
     "@babel/eslint-parser": "~7.25.1",
     "@babel/plugin-syntax-import-assertions": "^7.26.0",
     "@types/papaparse": "^5.3.15",
-    "eslint": "^9.14.0",
+    "eslint": "~9.11.0",
     "eslint-plugin-react": "~7.37.0",
     "eslint-plugin-vue": "~9.28.0",
     "globals": "~15.9.0",

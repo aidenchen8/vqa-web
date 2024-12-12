@@ -20,7 +20,7 @@ import type {
   CSVDataResponse,
 } from "@/types";
 
-const prefixUrl = "http://localhost:3000/api";
+const prefixUrl = "/api";
 
 // 创建 ky 实例
 const http = ky.create({
