@@ -31,7 +31,7 @@ export interface LoginResponse extends TokenResponse {
 
 export interface RegisterData {
   username: string;
-  encryptedPassword: string;
+  password: string;
 }
 
 export interface RegisterResponse extends TokenResponse {
@@ -49,8 +49,8 @@ export interface BatchUpdateRolesData {
 }
 
 export interface ChangePasswordData {
-  oldEncryptedPassword: string;
-  newEncryptedPassword: string;
+  oldPassword: string;
+  newPassword: string;
 }
 
 export interface FormStats {

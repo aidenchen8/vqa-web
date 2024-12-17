@@ -43,10 +43,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 import { ElMessage, ElForm, ElFormItem, ElInput, ElButton } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import JSEncrypt from "jsencrypt";
 
 const emit = defineEmits<{
   (e: "password-changed"): void;
@@ -84,39 +83,12 @@ const rules = ref<FormRules>({
   ],
 });
 
-const publicKey = ref("");
-const encryptor = new JSEncrypt();
-
-// 获取公钥
-const getPublicKey = async () => {
-  try {
-    const response = await fetch("http://localhost:3000/api/users/public-key");
-    const data = await response.json();
-    publicKey.value = data.publicKey;
-    encryptor.setPublicKey(publicKey.value);
-  } catch (error) {
-    console.error("获取公钥失败:", error);
-  }
-};
-
-onMounted(() => {
-  getPublicKey();
-});
-
 const handleSubmit = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
 
   await formEl.validate(async (valid) => {
     if (valid) {
       try {
-        // 加密密码
-        const oldEncryptedPassword = encryptor.encrypt(
-          passwordForm.value.oldPassword
-        );
-        const newEncryptedPassword = encryptor.encrypt(
-          passwordForm.value.newPassword
-        );
-
         const response = await fetch(
           "http://localhost:3000/api/users/change-password",
           {
@@ -126,8 +98,8 @@ const handleSubmit = async (formEl: FormInstance | undefined) => {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify({
-              oldEncryptedPassword,
-              newEncryptedPassword,
+              oldPassword: passwordForm.value.oldPassword,
+              newPassword: passwordForm.value.newPassword,
             }),
           }
         );

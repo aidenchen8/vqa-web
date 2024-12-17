@@ -79,10 +79,7 @@ const publicRequest = ky.create({
 export const api = {
   // 认证相关
   auth: {
-    getPublicKey: () =>
-      publicRequest.get("users/public-key").json<{ publicKey: string }>(),
-
-    login: (data: { username: string; encryptedPassword: string }) =>
+    login: (data: { username: string; password: string }) =>
       publicRequest.post("users/login", { json: data }).json<LoginResponse>(),
 
     refreshToken: (data: { refreshToken: string }) =>

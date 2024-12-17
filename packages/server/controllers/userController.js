@@ -1,63 +1,16 @@
 import { TokenService } from "../services/tokenService.js";
-import crypto from "crypto";
 import User from "../models/User.js";
-
-// 生成RSA密钥对
-const generateKeyPair = () => {
-  return crypto.generateKeyPairSync("rsa", {
-    modulusLength: 2048,
-    publicKeyEncoding: {
-      type: "spki",
-      format: "pem",
-    },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "pem",
-    },
-  });
-};
-
-const { publicKey, privateKey } = generateKeyPair();
-
-// 获取公钥
-export const getPublicKey = (req, res) => {
-  res.json({ publicKey });
-};
-
-// 解密密码的函数
-const decryptPassword = (encryptedPassword) => {
-  try {
-    const buffer = Buffer.from(encryptedPassword, "base64");
-    return crypto
-      .privateDecrypt(
-        {
-          key: privateKey,
-          padding: crypto.constants.RSA_PKCS1_PADDING,
-          oaepHash: "sha256",
-        },
-        buffer
-      )
-      .toString("utf8");
-  } catch (error) {
-    console.error("Decryption error details:", {
-      error: error.message,
-      stack: error.stack,
-      encryptedLength: encryptedPassword.length,
-    });
-    throw new Error("密码解密失败");
-  }
-};
 
 // 用户注册
 export const registerUser = async (req, res) => {
   try {
-    const { username, encryptedPassword } = req.body;
+    const { username, password } = req.body;
 
     // 检查请求参数
-    if (!username || !encryptedPassword) {
+    if (!username || !password) {
       console.log("Missing required fields:", {
         username: !!username,
-        encryptedPassword: !!encryptedPassword,
+        password: !!password,
       });
       return res.status(400).json({ message: "缺少必要参数" });
     }
@@ -67,15 +20,6 @@ export const registerUser = async (req, res) => {
     if (userExists) {
       console.log("User already exists:", username);
       return res.status(400).json({ message: "用户名已存在" });
-    }
-
-    // 解密密码
-    let password;
-    try {
-      password = decryptPassword(encryptedPassword);
-    } catch (error) {
-      console.error("Password decryption failed:", error);
-      return res.status(400).json({ message: error.message });
     }
 
     // 创建新用户
@@ -121,7 +65,7 @@ export const registerUser = async (req, res) => {
 // 用户登录
 export const loginUser = async (req, res) => {
   try {
-    const { username, encryptedPassword } = req.body;
+    const { username, password } = req.body;
 
     // 先查找用户
     const user = await User.findOne({ username });
@@ -129,15 +73,7 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: "用户名或密码错误" });
     }
 
-    // 使用相同的解密方法
-    let password;
-    try {
-      password = decryptPassword(encryptedPassword);
-    } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
-
-    // 使用 User model 的 matchPassword 方法验证密码
+    // 直接验证密码
     if (await user.matchPassword(password)) {
       // 生成令牌
       const tokens = TokenService.generateTokens(user);
@@ -302,29 +238,7 @@ export const getUserInfo = async (req, res) => {
 // 修改密码
 export const changePassword = async (req, res) => {
   try {
-    const { oldEncryptedPassword, newEncryptedPassword } = req.body;
-
-    // 解密旧密码
-    const oldPassword = crypto
-      .privateDecrypt(
-        {
-          key: privateKey,
-          padding: crypto.constants.RSA_PKCS1_PADDING,
-        },
-        Buffer.from(oldEncryptedPassword, "base64")
-      )
-      .toString();
-
-    // 解密新密码
-    const newPassword = crypto
-      .privateDecrypt(
-        {
-          key: privateKey,
-          padding: crypto.constants.RSA_PKCS1_PADDING,
-        },
-        Buffer.from(newEncryptedPassword, "base64")
-      )
-      .toString();
+    const { oldPassword, newPassword } = req.body;
 
     const user = await User.findById(req.user._id);
 

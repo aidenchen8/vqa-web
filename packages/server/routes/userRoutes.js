@@ -3,7 +3,6 @@ import {
   logout,
   loginUser,
   registerUser,
-  getPublicKey,
   getUserInfo,
   getAllUsers,
   updateUser,
@@ -15,7 +14,6 @@ import { protect, hasRole, authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.get("/public-key", getPublicKey);
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/logout", authenticateToken, logout);

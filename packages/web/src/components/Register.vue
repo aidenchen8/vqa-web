@@ -91,24 +91,15 @@ const rules = ref<FormRules>({
   ],
 });
 
-const { encrypt } = AuthService.initPublicKey();
-
 const handleRegister = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
 
   await formEl.validate(async (valid) => {
     if (valid) {
       try {
-        // 加密密码
-        const encryptedPassword = encrypt(registerForm.value.password);
-        if (!encryptedPassword) {
-          ElMessage.error("密码加密失败");
-          return;
-        }
-
         const response = await api.auth.register({
           username: registerForm.value.username,
-          encryptedPassword,
+          password: registerForm.value.password,
         });
 
         // 可以选择是否自动登录

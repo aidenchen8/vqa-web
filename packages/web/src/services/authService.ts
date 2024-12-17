@@ -1,4 +1,3 @@
-import JSEncrypt from "jsencrypt";
 import { useStore } from "@/store";
 import { api } from "@/utils/http";
 import type { UserInfo } from "@/types";
@@ -14,32 +13,6 @@ const TOKEN_KEY = "tokens";
 const USER_KEY = "user";
 
 export class AuthService {
-  public static initPublicKey() {
-    const encryptor = new JSEncrypt();
-
-    const fetchPublicKey = async () => {
-      try {
-        const response = await api.auth.getPublicKey();
-        encryptor.setPublicKey(response.publicKey);
-      } catch (error) {
-        console.error("获取公钥失败:", error);
-      }
-    };
-
-    fetchPublicKey();
-
-    const encrypt = (text: string) => {
-      const encrypted = encryptor.encrypt(text);
-      if (!encrypted) {
-        throw new Error("加密失败");
-      }
-      // 确保返回的是 base64 字符串
-      return encrypted;
-    };
-
-    return { encrypt };
-  }
-
   public static saveTokens(tokens: Tokens) {
     localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
   }
@@ -66,7 +39,6 @@ export class AuthService {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      debugger;
       localStorage.removeItem(TOKEN_KEY);
       window.location.replace(redirectUrl || window.location.origin);
     }

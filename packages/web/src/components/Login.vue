@@ -28,15 +28,11 @@ const loginForm = ref({
   password: "",
 });
 
-const { encrypt } = AuthService.initPublicKey();
-
 const handleLogin = async () => {
   try {
-    const encryptedPassword = encrypt(loginForm.value.password);
-
     const data = await api.auth.login({
       username: loginForm.value.username,
-      encryptedPassword,
+      password: loginForm.value.password,
     });
     console.log("login", data);
 
