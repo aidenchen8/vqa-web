@@ -2,12 +2,18 @@
 import FormData from "../models/FormData.js";
 import User from "../models/User.js";
 import { TokenService } from "../services/tokenService.js";
+import { loggerService } from "../services/loggerService.js";
 
 export const saveFormData = async (req, res) => {
+  const startTime = Date.now();
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(" ")[1];
     const user = await TokenService.getUserFromToken(token);
+
+    loggerService.info(
+      `保存表单数据 - User: ${user.username}, File: ${req.body.imageFileName}`
+    );
 
     const { question, answer, vgGuide, selectedBboxes, imageFileName } =
       req.body;
@@ -43,11 +49,16 @@ export const saveFormData = async (req, res) => {
       answer: { $exists: true, $ne: "" },
     });
 
+    const duration = Date.now() - startTime;
+    loggerService.info(
+      `表单数据保存成功 - User: ${user.username}, Duration: ${duration}ms`
+    );
     res.json({
       formData,
       completedQuestions,
     });
   } catch (error) {
+    loggerService.error("保存表单数据失败", error);
     res.status(500).json({ message: "保存失败", error: error.message });
   }
 };
@@ -66,6 +77,7 @@ export const getFormData = async (req, res) => {
 
     res.json(formData);
   } catch (error) {
+    loggerService.error("获取form数据失败", error);
     res.status(500).json({ message: "获取数据失败", error: error.message });
   }
 };
@@ -82,6 +94,7 @@ export const getStats = async (req, res) => {
       completedQuestions,
     });
   } catch (error) {
+    loggerService.error("获取统计信息失败", error);
     res.status(500).json({ message: "获取统计信息失败", error: error.message });
   }
 };
@@ -112,6 +125,7 @@ export const queryFormData = async (req, res) => {
       pageSize: parseInt(pageSize),
     });
   } catch (error) {
+    loggerService.error("查询form失败", error);
     res.status(500).json({ message: "查询失败", error: error.message });
   }
 };

@@ -119,7 +119,7 @@ import { ElMessageBox, ElMessage, type ElForm } from "element-plus";
 import { getFilePath } from "@/utils/config";
 import { AuthService } from "@/services/authService";
 import { useStore } from "@/store";
-import type { FormDataItem, BBox, CSVDataResponse } from "@/types";
+import type { FormDataItem, BBox } from "@/types";
 import { api } from "@/utils/http";
 
 const store = useStore();
@@ -142,7 +142,12 @@ const loadStats = async () => {
 };
 
 // 获取列表信息
-const fileInfo = ref<CSVDataResponse>();
+const fileInfo = ref<
+  {
+    fileIndexMap: string[];
+    type: string;
+  }[]
+>();
 const currentFileInfo = computed(() => fileInfo.value?.[0]);
 const currentFileNameOptions = computed(() => {
   if (currentFileInfo.value?.fileIndexMap) {
@@ -167,21 +172,34 @@ async function getList() {
 const loadFormData = async () => {
   try {
     formRef.value?.resetFields();
-    const res = await api.form.queryByFileName(currentFileName.value);
-    if (res?.[0]) {
-      const data = res[0];
-      formData.value.answer = data.answer;
-      formData.value.question = data.question;
-      formData.value.vgGuide = data.vgGuide;
-      formData.value.selectedBboxes = data.selectedBboxes.map(
-        ({ _id, ...rest }) => rest
-      );
+    // 1. 获取表单历史数据
+    const formHistory = await api.form.queryByFileName(currentFileName.value);
+    if (formHistory?.[0]) {
+      const data = formHistory[0];
+      formData.value = {
+        answer: data.answer,
+        question: data.question,
+        vgGuide: data.vgGuide,
+        selectedBboxes:
+          data.selectedBboxes?.map(({ _id, ...rest }) => rest) || [],
+      };
+    } else {
+      // 重置 formData
+      formData.value = {
+        question: "",
+        answer: "",
+        vgGuide: "",
+        selectedBboxes: [],
+      };
     }
+
+    // 2. 获取当前文件的问题数据
+    const questionsData = await api.csv.queryByFileName(currentFileName.value);
+    tableData.value = questionsData.questions;
   } catch (error) {
-    console.error("加载历史数据失败", error);
+    console.error("加载数据失败", error);
+    ElMessage.error("加载数据失败");
   } finally {
-    tableData.value =
-      currentFileInfo.value?.questionsMap[currentFileName.value]!;
     displayImage(currentFileName.value);
   }
 };
@@ -241,9 +259,12 @@ const currentRow = ref();
 
 const selectQuestion = (row: FormDataItem) => {
   currentRow.value = row;
-  formData.value.question = row.question;
-  formData.value.answer = row.answer;
-  formData.value.vgGuide = row.vgGuide;
+  formData.value = {
+    question: row.question,
+    answer: row.answer,
+    vgGuide: row.vgGuide,
+    selectedBboxes: [],
+  };
 };
 
 const formData = ref<{
@@ -409,10 +430,11 @@ function handleBboxClick(bbox: BBox) {
 // 保存表单数据
 const handleSave = async () => {
   try {
-    await api.form.save({
+    const res = await api.form.save({
       ...formData.value,
       imageFileName: currentFileName.value,
     });
+    finishedNum.value = res.completedQuestions;
     ElMessage.success("保存成功");
     await loadFormData();
   } catch (error) {

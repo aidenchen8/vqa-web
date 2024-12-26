@@ -1,6 +1,7 @@
 import CSVData from "../models/CSVData.js";
 import { TokenService } from "../services/tokenService.js";
 import Papa from "papaparse";
+import { loggerService } from "../services/loggerService.js";
 
 // 解析CSV文件
 const parseCSVFile = (fileContent) => {
@@ -51,27 +52,28 @@ const parseCSVFile = (fileContent) => {
 export const checkUserData = async (req, res) => {
   try {
     const csvData = await CSVData.findOne({ user: req.user._id });
+    loggerService.info(`检查用户数据 - User: ${req.user.username}`);
     res.json({ hasData: !!csvData });
   } catch (error) {
+    loggerService.error("检查用户数据失败", error);
     res.status(500).json({ message: "检查失败", error: error.message });
   }
 };
 
 // 上传并处理CSV文件
 export const uploadCSV = async (req, res) => {
+  const startTime = Date.now();
   try {
     const fileContent = req.body.fileContent;
-    const forceUpdate = req.body.forceUpdate; // 是否强制更新
-    const authType = req.body.type; // 获取用户类型
+    const forceUpdate = req.body.forceUpdate;
+    const authType = req.body.type;
+    const user = await TokenService.getUserFromToken(
+      req.headers.authorization.split(" ")[1]
+    );
 
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(" ")[1];
-
-    if (!token) {
-      return res.status(401).json({ message: "未提供认证令牌" });
-    }
-
-    const user = await TokenService.getUserFromToken(token);
+    loggerService.info(
+      `开始上传CSV文件 - User: ${user.username}, Type: ${authType}`
+    );
 
     if (!user) {
       return res.status(401).json({ message: "未找到用户信息" });
@@ -109,52 +111,89 @@ export const uploadCSV = async (req, res) => {
       });
     }
 
+    const duration = Date.now() - startTime;
+    loggerService.info(
+      `CSV文件上传成功 - User: ${user.username}, Duration: ${duration}ms`
+    );
     res.json({
       message: "文件上传成功",
       status: "success",
     });
   } catch (error) {
+    loggerService.error("上传CSV文件失败", error);
     res.status(500).json({ message: "上传失败", error: error.message });
   }
 };
 
-// 获取用户的CSV数据
+// 获取用户的CSV数据索引列表
 export const getCSVData = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(" ")[1];
-    const user = await TokenService.getUserFromToken(token);
+    const user = await TokenService.getUserFromToken(
+      req.headers.authorization.split(" ")[1]
+    );
+    loggerService.info(`获取CSV数据列表 - User: ${user.username}`);
 
     if (!user || !user.roles) {
       return res.status(401).json({ message: "未找到用户信息或角色" });
     }
 
-    // 根据用户的 roles 查询 CSV 数据
-    const csvDataList = await CSVData.find({ type: { $in: user.roles } });
+    // 只查询文件名列表和类型信息
+    const csvDataList = await CSVData.find(
+      { type: { $in: user.roles } },
+      { "files.fileName": 1, type: 1 }
+    );
 
     if (csvDataList.length === 0) {
       return res.status(404).json({ message: "未找到CSV数据" });
     }
 
-    // 转换数据格式为前端所需的格式
-    const result = csvDataList.map((csvData) => {
-      const questionsMap = {};
-      const fileIndexMap = [];
-
-      csvData.files.forEach((file) => {
-        questionsMap[file.fileName] = file.questions;
-        fileIndexMap.push(file.fileName);
-      });
-
-      return {
-        questionsMap,
-        fileIndexMap,
-        type: csvData.type, // 返回对应的类型
-      };
-    });
+    // 转换数据格式
+    const result = csvDataList.map((csvData) => ({
+      fileIndexMap: csvData.files.map((file) => file.fileName),
+      type: csvData.type,
+    }));
 
     res.json(result);
   } catch (error) {
+    loggerService.error("获取CSV数据列表失败", error);
+    res.status(500).json({ message: "获取数据失败", error: error.message });
+  }
+};
+
+// 新增：根据文件名获取具体问题数据
+export const getQuestionsByFileName = async (req, res) => {
+  try {
+    const { fileName } = req.query;
+    const user = await TokenService.getUserFromToken(
+      req.headers.authorization.split(" ")[1]
+    );
+
+    loggerService.info(
+      `获取文件问题数据 - User: ${user.username}, File: ${fileName}`
+    );
+
+    if (!user || !user.roles) {
+      return res.status(401).json({ message: "未找到用户信息或角色" });
+    }
+
+    const csvData = await CSVData.findOne(
+      {
+        type: { $in: user.roles },
+        "files.fileName": fileName,
+      },
+      {
+        "files.$": 1,
+        type: 1,
+      }
+    );
+
+    if (!csvData || !csvData.files[0]) {
+      return res.status(404).json({ message: "未找到对应文件数据" });
+    }
+
+    res.json(csvData.files[0]);
+  } catch (error) {
+    loggerService.error("获取文件问题数据失败", error);
     res.status(500).json({ message: "获取数据失败", error: error.message });
   }
 };

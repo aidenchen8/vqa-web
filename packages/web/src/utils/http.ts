@@ -18,6 +18,7 @@ import type {
   CSVUploadResponse,
   CSVCheckResponse,
   CSVDataResponse,
+  CSVQueryResponse,
 } from "@/types";
 
 const prefixUrl = "/api";
@@ -140,6 +141,9 @@ export const api = {
       http.post("csv/upload", { json: data }).json<CSVUploadResponse>(),
 
     getData: () => http.get("csv/data").json<CSVDataResponse>(),
+
+    queryByFileName: (fileName: string) =>
+      http.get(`csv/query?fileName=${fileName}`).json<CSVQueryResponse>(),
   },
 };
 

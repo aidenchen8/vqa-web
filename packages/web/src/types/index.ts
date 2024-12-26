@@ -84,7 +84,10 @@ export interface SaveFormData {
   imageFileName: string;
 }
 
-export type SaveFormResponse = FormDataItem;
+export type SaveFormResponse = {
+  completedQuestions: number;
+  formData: FormDataItem;
+};
 
 export type FormQueryResponse = SaveFormData[];
 export interface CSVUploadData {
@@ -110,3 +113,9 @@ export interface CSVDataMapItem {
 }
 
 export type CSVDataResponse = CSVDataMapItem[];
+
+export type CSVQueryResponse = {
+  fileName: string;
+  questions: FormDataItem[];
+  _id: string;
+};
